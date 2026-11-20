@@ -1,0 +1,199 @@
+//! Projects are plain folders: `main.typ`, `assets/`, `templates/`, `out/`.
+
+use std::fs;
+use std::path::{Component, Path, PathBuf};
+use std::time::UNIX_EPOCH;
+
+use serde::Serialize;
+
+use crate::templates;
+
+pub fn projects_dir() -> Result<PathBuf, String> {
+    let base = dirs::document_dir().ok_or("Dokumente-Ordner nicht gefunden")?;
+    let dir = base.join("Typst");
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir)
+}
+
+#[derive(Serialize)]
+pub struct ProjectInfo {
+    name: String,
+    path: String,
+    modified: u64,
+    files: usize,
+}
+
+pub fn list_projects() -> Result<Vec<ProjectInfo>, String> {
+    let dir = projects_dir()?;
+    let mut out = Vec::new();
+    for entry in fs::read_dir(&dir).map_err(|e| e.to_string())?.flatten() {
+        let path = entry.path();
+        if !path.is_dir() || is_hidden(&path) || entry.file_name() == templates::USER_DIR {
+            continue;
+        }
+        let files = walk_files(&path);
+        if !files.iter().any(|f| f.ends_with(".typ")) {
+            continue;
+        }
+        let modified = files
+            .iter()
+            .filter_map(|f| fs::metadata(path.join(f)).ok()?.modified().ok())
+            .max()
+            .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        out.push(ProjectInfo {
+            name: entry.file_name().to_string_lossy().into_owned(),
+            path: path.to_string_lossy().into_owned(),
+            modified,
+            files: files.len(),
+        });
+    }
+    out.sort_by(|a, b| b.modified.cmp(&a.modified));
+    Ok(out)
+}
+
+pub fn create_project(name: &str, template: &str, fields: &[(String, String)]) -> Result<String, String> {
+    let clean: String = name
+        .trim()
+        .chars()
+        .map(|c| if matches!(c, '/' | ':' | '\\') { '-' } else { c })
+        .collect();
+    if clean.is_empty() || clean.starts_with('.') || clean == templates::USER_DIR {
+        return Err("Ungültiger Projektname".into());
+    }
+    let dir = projects_dir()?.join(&clean);
+    if dir.exists() {
+        return Err(format!("Ein Projekt namens „{clean}“ existiert bereits"));
+    }
+    fs::create_dir_all(dir.join("assets")).map_err(|e| e.to_string())?;
+    if let Err(e) = templates::materialize(template, &dir, fields) {
+        let _ = fs::remove_dir_all(&dir);
+        return Err(e);
+    }
+    Ok(dir.to_string_lossy().into_owned())
+}
+
+#[derive(Serialize)]
+pub struct FileEntry {
+    path: String,
+    kind: &'static str,
+}
+
+pub fn file_kind(rel: &str) -> &'static str {
+    let ext = Path::new(rel).extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
+    match ext.as_str() {
+        "typ" => "typ",
+        "png" | "jpg" | "jpeg" | "gif" | "svg" | "webp" => "image",
+        "pdf" => "pdf",
+        "bib" | "yml" | "yaml" | "csv" | "json" | "toml" | "txt" | "md" | "xml" => "text",
+        _ => "other",
+    }
+}
+
+pub fn list_files(root: &Path) -> Vec<FileEntry> {
+    walk_files(root).into_iter().map(|path| FileEntry { kind: file_kind(&path), path }).collect()
+}
+
+/// All non-hidden files below `root`, as sorted, `/`-separated relative paths.
+pub fn walk_files(root: &Path) -> Vec<String> {
+    fn rec(root: &Path, dir: &Path, out: &mut Vec<String>, depth: usize) {
+        if depth > 8 || out.len() > 5000 {
+            return;
+        }
+        let Ok(entries) = fs::read_dir(dir) else { return };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if is_hidden(&path) {
+                continue;
+            }
+            if path.is_dir() {
+                rec(root, &path, out, depth + 1);
+            } else if let Ok(rel) = path.strip_prefix(root) {
+                let rel: Vec<String> =
+                    rel.components().map(|c| c.as_os_str().to_string_lossy().into_owned()).collect();
+                out.push(rel.join("/"));
+            }
+        }
+    }
+    let mut out = Vec::new();
+    rec(root, root, &mut out, 0);
+    out.sort_by_key(|p| (p.matches('/').count() > 0, p.to_lowercase()));
+    out
+}
+
+fn is_hidden(path: &Path) -> bool {
+    path.file_name().map(|n| n.to_string_lossy().starts_with('.')).unwrap_or(false)
+}
+
+/// Resolve a project-relative path, refusing anything that escapes the root.
+pub fn resolve(root: &Path, rel: &str) -> Result<PathBuf, String> {
+    let rel_path = Path::new(rel);
+    if rel_path.is_absolute()
+        || rel_path.components().any(|c| matches!(c, Component::ParentDir | Component::Prefix(_)))
+    {
+        return Err("Pfad liegt außerhalb des Projekts".into());
+    }
+    Ok(root.join(rel_path))
+}
+
+pub fn read_text(root: &Path, rel: &str) -> Result<String, String> {
+    fs::read_to_string(resolve(root, rel)?).map_err(|e| e.to_string())
+}
+
+pub fn write_text(root: &Path, rel: &str, text: &str) -> Result<(), String> {
+    let path = resolve(root, rel)?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    fs::write(path, text).map_err(|e| e.to_string())
+}
+
+pub fn create_file(root: &Path, rel: &str) -> Result<(), String> {
+    let path = resolve(root, rel)?;
+    if path.exists() {
+        return Err("Datei existiert bereits".into());
+    }
+    write_text(root, rel, "")
+}
+
+pub fn rename(root: &Path, from: &str, to: &str) -> Result<(), String> {
+    let (a, b) = (resolve(root, from)?, resolve(root, to)?);
+    if b.exists() {
+        return Err("Ziel existiert bereits".into());
+    }
+    if let Some(parent) = b.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    fs::rename(a, b).map_err(|e| e.to_string())
+}
+
+/// Copies external files (e.g. dropped images) into `<project>/<subdir>/`.
+/// Returns the new project-relative paths.
+pub fn import_files(root: &Path, paths: &[String], subdir: &str) -> Result<Vec<String>, String> {
+    let target_dir = resolve(root, subdir)?;
+    fs::create_dir_all(&target_dir).map_err(|e| e.to_string())?;
+    let mut out = Vec::new();
+    for p in paths {
+        let src = PathBuf::from(p);
+        // Already inside the project? Just reference it.
+        if let Ok(rel) = src.strip_prefix(root) {
+            out.push(rel.to_string_lossy().replace('\\', "/"));
+            continue;
+        }
+        let name = src.file_name().ok_or("Ungültige Datei")?.to_string_lossy().into_owned();
+        let (stem, ext) = match name.rsplit_once('.') {
+            Some((s, e)) => (s.to_string(), format!(".{e}")),
+            None => (name.clone(), String::new()),
+        };
+        let mut candidate = name.clone();
+        let mut n = 2;
+        while target_dir.join(&candidate).exists() {
+            candidate = format!("{stem}-{n}{ext}");
+            n += 1;
+        }
+        fs::copy(&src, target_dir.join(&candidate)).map_err(|e| e.to_string())?;
+        out.push(format!("{subdir}/{candidate}"));
+    }
+    Ok(out)
+}

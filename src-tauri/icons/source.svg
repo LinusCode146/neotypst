@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3a62e0"/>
+      <stop offset="1" stop-color="#1b2f8a"/>
+    </linearGradient>
+    <linearGradient id="paper" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#eef0f6"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#0a1440" flood-opacity="0.45"/>
+    </filter>
+    <filter id="appshadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#000" flood-opacity="0.28"/>
+    </filter>
+    <pattern id="grid" width="36" height="36" patternUnits="userSpaceOnUse">
+      <path d="M36 0 V36 M0 36 H36" stroke="#d6def3" stroke-width="2.5" fill="none"/>
+    </pattern>
+    <clipPath id="sheet">
+      <path d="M0 28 a28 28 0 0 1 28 -28 h360 l112 112 v480 a28 28 0 0 1 -28 28 h-444 a28 28 0 0 1 -28 -28z"/>
+    </clipPath>
+  </defs>
+
+  <!-- macOS app tile (Apple grid: 824 px tile on 1024 canvas) -->
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)" filter="url(#appshadow)"/>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="none" stroke="#ffffff" stroke-opacity="0.12" stroke-width="3"/>
+
+  <!-- worksheet with Karo grid -->
+  <g transform="translate(262 196) rotate(-5 250 310)" filter="url(#shadow)">
+    <g clip-path="url(#sheet)">
+      <rect width="500" height="620" fill="url(#paper)"/>
+      <rect x="0" y="0" width="500" height="620" fill="url(#grid)"/>
+    </g>
+    <path d="M388 0 v84 a28 28 0 0 0 28 28 h84z" fill="#c9d2ea"/>
+
+    <!-- serif T -->
+    <path fill="#1f3aa6" d="
+      M118 150 h264 v86 h-26 q-6 -40 -46 -44 h-34 v268 q0 28 30 32 h14 v28 h-188 v-28 h14 q30 -4 30 -32 v-268 h-34 q-40 4 -46 44 h-26 z"/>
+    <!-- caret -->
+    <rect x="344" y="300" width="18" height="190" rx="8" fill="#ff7a45"/>
+    <!-- formula-ish line -->
+    <rect x="96" y="560" width="150" height="14" rx="7" fill="#9fb0dd"/>
+    <rect x="262" y="560" width="80" height="14" rx="7" fill="#9fb0dd"/>
+  </g>
+</svg>
