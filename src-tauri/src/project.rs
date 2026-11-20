@@ -91,8 +91,36 @@ pub fn file_kind(rel: &str) -> &'static str {
     }
 }
 
+/// Files and folders (also empty ones) for the file tree. Folders have kind `dir`.
 pub fn list_files(root: &Path) -> Vec<FileEntry> {
-    walk_files(root).into_iter().map(|path| FileEntry { kind: file_kind(&path), path }).collect()
+    let mut out: Vec<FileEntry> = walk_files(root).into_iter().map(|path| FileEntry { kind: file_kind(&path), path }).collect();
+    out.extend(walk_dirs(root).into_iter().map(|path| FileEntry { path, kind: "dir" }));
+    out
+}
+
+/// All non-hidden folders below `root`.
+pub fn walk_dirs(root: &Path) -> Vec<String> {
+    fn rec(root: &Path, dir: &Path, out: &mut Vec<String>, depth: usize) {
+        if depth > 8 || out.len() > 2000 {
+            return;
+        }
+        let Ok(entries) = fs::read_dir(dir) else { return };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if is_hidden(&path) || !path.is_dir() {
+                continue;
+            }
+            if let Ok(rel) = path.strip_prefix(root) {
+                let rel: Vec<String> = rel.components().map(|c| c.as_os_str().to_string_lossy().into_owned()).collect();
+                out.push(rel.join("/"));
+            }
+            rec(root, &path, out, depth + 1);
+        }
+    }
+    let mut out = Vec::new();
+    rec(root, root, &mut out, 0);
+    out.sort();
+    out
 }
 
 /// All non-hidden files below `root`, as sorted, `/`-separated relative paths.
@@ -168,6 +196,91 @@ pub fn rename(root: &Path, from: &str, to: &str) -> Result<(), String> {
     fs::rename(a, b).map_err(|e| e.to_string())
 }
 
+pub fn create_dir(root: &Path, rel: &str) -> Result<(), String> {
+    let path = resolve(root, rel)?;
+    if path.exists() {
+        return Err("Ordner existiert bereits".into());
+    }
+    fs::create_dir_all(path).map_err(|e| e.to_string())
+}
+
+/// Copies a file or folder next to itself (`name kopie.ext`, `name kopie 2.ext`, …).
+/// Returns the new relative path.
+pub fn duplicate(root: &Path, rel: &str) -> Result<String, String> {
+    let src = resolve(root, rel)?;
+    let (dir, name) = match rel.rsplit_once('/') {
+        Some((d, n)) => (format!("{d}/"), n.to_string()),
+        None => (String::new(), rel.to_string()),
+    };
+    let (stem, ext) = match name.rsplit_once('.') {
+        Some((s, e)) if !s.is_empty() && src.is_file() => (s.to_string(), format!(".{e}")),
+        _ => (name.clone(), String::new()),
+    };
+    let mut n = 1;
+    let target = loop {
+        let candidate = if n == 1 { format!("{dir}{stem} kopie{ext}") } else { format!("{dir}{stem} kopie {n}{ext}") };
+        if !resolve(root, &candidate)?.exists() {
+            break candidate;
+        }
+        n += 1;
+    };
+    copy_recursive(&src, &resolve(root, &target)?)?;
+    Ok(target)
+}
+
+fn copy_recursive(src: &Path, dst: &Path) -> Result<(), String> {
+    if src.is_dir() {
+        fs::create_dir_all(dst).map_err(|e| e.to_string())?;
+        for entry in fs::read_dir(src).map_err(|e| e.to_string())?.flatten() {
+            copy_recursive(&entry.path(), &dst.join(entry.file_name()))?;
+        }
+        Ok(())
+    } else {
+        fs::copy(src, dst).map(|_| ()).map_err(|e| e.to_string())
+    }
+}
+
+/// Moves a file or folder to the macOS Trash. Returns where it ended up, so it
+/// can be restored.
+pub fn trash(root: &Path, rel: &str) -> Result<String, String> {
+    if rel.trim_matches('/').is_empty() {
+        return Err("Das Projekt selbst kann hier nicht gelöscht werden".into());
+    }
+    let path = resolve(root, rel)?;
+    if !path.exists() {
+        return Err("Datei existiert nicht".into());
+    }
+    trash_path(&path)
+}
+
+#[cfg(target_os = "macos")]
+fn trash_path(path: &Path) -> Result<String, String> {
+    use objc2_foundation::{NSFileManager, NSString, NSURL};
+    let url = NSURL::fileURLWithPath(&NSString::from_str(&path.to_string_lossy()));
+    let mut out = None;
+    NSFileManager::defaultManager()
+        .trashItemAtURL_resultingItemURL_error(&url, Some(&mut out))
+        .map_err(|e| e.localizedDescription().to_string())?;
+    Ok(out.and_then(|u| u.path()).map(|p| p.to_string()).unwrap_or_default())
+}
+
+#[cfg(not(target_os = "macos"))]
+fn trash_path(_path: &Path) -> Result<String, String> {
+    Err("Papierkorb wird nur unter macOS unterstützt".into())
+}
+
+/// Moves an item back from the Trash to its old place in the project.
+pub fn restore(root: &Path, trashed: &str, rel: &str) -> Result<(), String> {
+    let target = resolve(root, rel)?;
+    if target.exists() {
+        return Err("Am alten Ort liegt inzwischen eine andere Datei".into());
+    }
+    if let Some(parent) = target.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    fs::rename(trashed, target).map_err(|e| e.to_string())
+}
+
 /// Copies external files (e.g. dropped images) into `<project>/<subdir>/`.
 /// Returns the new project-relative paths.
 pub fn import_files(root: &Path, paths: &[String], subdir: &str) -> Result<Vec<String>, String> {
@@ -196,4 +309,37 @@ pub fn import_files(root: &Path, paths: &[String], subdir: &str) -> Result<Vec<S
         out.push(format!("{subdir}/{candidate}"));
     }
     Ok(out)
+}
+
+#[cfg(test)]
+mod file_ops_tests {
+    use super::*;
+
+    #[test]
+    fn folders_duplicate_trash_restore() {
+        let root = std::env::temp_dir().join("neotypst-fileops-test");
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        create_dir(&root, "kapitel/leer").unwrap();
+        create_file(&root, "kapitel/a.typ").unwrap();
+        let entries = list_files(&root);
+        let has = |p: &str, k: &str| entries.iter().any(|e| e.path == p && e.kind == k);
+        assert!(has("kapitel", "dir") && has("kapitel/leer", "dir") && has("kapitel/a.typ", "typ"));
+        assert!(create_dir(&root, "kapitel").is_err());
+
+        assert_eq!(duplicate(&root, "kapitel/a.typ").unwrap(), "kapitel/a kopie.typ");
+        assert_eq!(duplicate(&root, "kapitel/a.typ").unwrap(), "kapitel/a kopie 2.typ");
+        assert_eq!(duplicate(&root, "kapitel/leer").unwrap(), "kapitel/leer kopie");
+
+        rename(&root, "kapitel", "teile/kapitel").unwrap();
+        assert!(root.join("teile/kapitel/a.typ").exists());
+
+        assert!(trash(&root, "").is_err());
+        assert!(resolve(&root, "../x").is_err());
+        let trashed = trash(&root, "teile/kapitel/a.typ").unwrap();
+        assert!(!root.join("teile/kapitel/a.typ").exists() && Path::new(&trashed).exists());
+        restore(&root, &trashed, "teile/kapitel/a.typ").unwrap();
+        assert!(root.join("teile/kapitel/a.typ").exists());
+        let _ = fs::remove_dir_all(&root);
+    }
 }

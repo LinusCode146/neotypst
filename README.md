@@ -44,6 +44,17 @@ Projekt/
 └── out/            exportierte PDFs
 ```
 
+### Dateibaum
+
+- **Rechtsklick** auf eine Datei: Öffnen, als Hauptdatei festlegen, als Abbildung einfügen, Umbenennen, Duplizieren, Pfad kopieren (so, wie er in der aktuellen Datei für `#image`/`#include` geschrieben wird), im Finder zeigen, in den Papierkorb.
+- **Rechtsklick auf einen Ordner:** zusätzlich „Neue Datei hier“ und „Neuer Ordner hier“. Rechtsklick auf freie Fläche legt Dateien und Ordner im Projekt an.
+- **Oben** gibt es Knöpfe für neue Datei, neuen Ordner (im markierten Ordner) und „alle zuklappen“. Ohne Endung wird eine Datei zu `.typ`, Pfade wie `kapitel/einleitung` legen Unterordner gleich mit an.
+- **Verschieben** per Ziehen auf einen Ordner, oder auf freie Fläche für die oberste Ebene. Offene Dateien und die Hauptdatei ziehen mit um.
+- **Löschen** legt in den macOS-Papierkorb, „Rückgängig“ in der Meldung holt die Datei zurück. Die Hauptdatei ist geschützt.
+- **Filtern:** Das Suchfeld zeigt passende Dateien mit ihren Ordnern, ↩ öffnet den ersten Treffer, ↓ springt in die Liste.
+- **Tastatur** im Baum: ↑/↓ wählen, →/← auf- und zuklappen, ↩ öffnen, F2 umbenennen, ⌘D duplizieren, ⌘⌫ in den Papierkorb.
+- Im Finder hinzugefügte Dateien erscheinen, sobald du zu NeoTypst zurückwechselst. Aufgeklappte Ordner merkt sich der Baum pro Projekt.
+
 ## Tastenkürzel
 
 | Kürzel | Aktion |

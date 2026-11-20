@@ -2270,3 +2270,119 @@ kbd.on-primary {
 .matrix-dialog .dialog-foot .toggle {
   white-space: nowrap;
 }
+
+/* File tree */
+.file-tree {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.file-tree .tree {
+  outline: none;
+}
+.head-actions {
+  display: flex;
+  gap: 1px;
+}
+.head-actions svg {
+  width: 15px;
+  height: 15px;
+}
+.tree-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 8px 6px;
+  padding: 0 4px 0 8px;
+  height: 26px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--raised);
+  color: var(--muted);
+}
+.tree-search:focus-within {
+  border-color: var(--accent);
+}
+.tree-search svg {
+  width: 13px;
+  height: 13px;
+  flex: none;
+}
+.tree-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: none;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--text);
+}
+.tree-search .mini {
+  width: 18px;
+  height: 18px;
+}
+.tree-row {
+  cursor: default;
+  user-select: none;
+}
+.tree-row .twisty {
+  width: 12px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  margin-right: -3px;
+}
+.tree-row .twisty svg {
+  width: 11px;
+  height: 11px;
+  transition: transform 0.12s;
+  opacity: 0.6;
+}
+.tree-row .twisty.open svg {
+  transform: rotate(90deg);
+}
+.file-tree .tree:focus .tree-row.selected:not(.active) {
+  background: var(--line-strong);
+  color: var(--text);
+}
+.tree-row.selected:not(.active) {
+  background: var(--line);
+}
+.tree-row.dragging {
+  opacity: 0.45;
+}
+.tree-row.drop-target,
+.tree.drop-root {
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+.tree-row mark {
+  background: rgba(255, 196, 0, 0.35);
+  color: inherit;
+  border-radius: 2px;
+}
+.tree-empty {
+  padding: 10px 14px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.drag-ghost {
+  position: fixed;
+  z-index: 80;
+  pointer-events: none;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--raised);
+  border: 1px solid var(--line-strong);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.drag-ghost span {
+  color: var(--accent);
+}
+.menu button.danger {
+  color: var(--danger);
+}

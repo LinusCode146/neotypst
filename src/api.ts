@@ -12,7 +12,7 @@ export type Field = {
   remember: boolean;
 };
 export type Template = { id: string; name: string; description: string; category: string; fields: Field[]; user: boolean };
-export type FileKind = "typ" | "image" | "pdf" | "text" | "other";
+export type FileKind = "typ" | "image" | "pdf" | "text" | "other" | "dir";
 export type FileEntry = { path: string; kind: FileKind };
 export type OpenedProject = { root: string; name: string; main: string; files: FileEntry[] };
 
@@ -57,6 +57,10 @@ export const api = {
   writeFile: (rel: string, text: string) => invoke<void>("write_file", { rel, text }),
   createFile: (rel: string) => invoke<void>("create_file", { rel }),
   renameFile: (from: string, to: string) => invoke<void>("rename_file", { from, to }),
+  createDir: (rel: string) => invoke<void>("create_dir", { rel }),
+  duplicateFile: (rel: string) => invoke<string>("duplicate_file", { rel }),
+  trashFile: (rel: string) => invoke<string>("trash_file", { rel }),
+  restoreFile: (trashed: string, rel: string) => invoke<void>("restore_file", { trashed, rel }),
   importFiles: (paths: string[], subdir = "assets") => invoke<string[]>("import_files", { paths, subdir }),
   absolutePath: (rel: string) => invoke<string>("absolute_path", { rel }),
 

@@ -13,6 +13,7 @@ import { getSettings, setSettings, useSettings } from "./settings";
 
 const getSettingsSpell = () => getSettings().spell;
 import { TableEditor, emptyGrid, generate, gridFromModel } from "./TableEditor";
+import { FileTree, fileIcon, type MenuItem, type TreeActions } from "./FileTree";
 import { MatrixEditor, emptyMatrix, generateMatrix, parseMatrix, type MatrixGrid } from "./MatrixEditor";
 import { SymbolPalette } from "./SymbolPalette";
 import { GraphicsGallery } from "./GraphicsGallery";
@@ -20,22 +21,9 @@ import { GRAPHICS, type GraphicBlock } from "./graphics";
 import type { SymbolEntry } from "./symbolData";
 
 type Toast = { text: string; kind?: "error"; actions?: { label: string; run(): void }[] };
-type Menu = { x: number; y: number; items: ({ label: string; detail?: string; run(): void } | "sep")[] };
+type Menu = { x: number; y: number; items: MenuItem[] };
 
 const IMAGE_EXT = /\.(png|jpe?g|gif|svg|webp)$/i;
-
-function fileIcon(kind: FileEntry["kind"]) {
-  switch (kind) {
-    case "typ":
-      return <Icon.typ />;
-    case "image":
-      return <Icon.image />;
-    case "pdf":
-      return <Icon.pdf />;
-    default:
-      return <Icon.file />;
-  }
-}
 
 /** Headings (`= Titel`) of the current file, ignoring raw blocks. */
 function outlineOf(text: string) {
@@ -72,10 +60,7 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
   const [cursor, setCursor] = useState({ line: 1, col: 1 });
   const [menu, setMenu] = useState<Menu | null>(null);
   const [toast, setToast] = useState<Toast | null>(null);
-  const [newFile, setNewFile] = useState<string | null>(null);
-  const [renaming, setRenaming] = useState<string | null>(null);
   const [split, setSplit] = useState(() => Number(localStorage.getItem("neotypst.split")) || 0.5);
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [symbolsOpen, setSymbolsOpen] = useState(false);
   const [graphicsOpen, setGraphicsOpen] = useState(false);
   const [litOpen, setLitOpen] = useState(false);
@@ -98,6 +83,12 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
     /** Not inside a formula: wrap the result in `$ … $`. */
     wrap: boolean;
   } | null>(null);
+
+  const [treeRequest, setTreeRequest] = useState<{ kind: "file" | "dir"; n: number } | null>(null);
+  const requestTree = useCallback((kind: "file" | "dir") => {
+    if (!getSettings().sidebar) setSettings({ sidebar: true });
+    setTreeRequest((r) => ({ kind, n: (r?.n ?? 0) + 1 }));
+  }, []);
 
   const svgCache = useRef(new Map<string, string>());
   const latest = useRef<{ rel: string; text: string } | null>(null);
@@ -256,6 +247,13 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
     setFiles(await api.listFiles());
   }, []);
 
+  // Pick up files added or removed in the Finder when coming back to the app.
+  useEffect(() => {
+    const onFocus = () => void refreshFiles().catch(() => {});
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [refreshFiles]);
+
   const openFile = useCallback(
     async (rel: string, reveal?: number) => {
       if (rel === currentRef.current) {
@@ -398,41 +396,50 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
   );
 
   const createFile = useCallback(
-    async (name: string) => {
-      let rel = name.trim();
-      if (!rel) return;
+    async (name: string): Promise<string | null> => {
+      let rel = name.trim().replace(/^\/+/, "");
+      if (!rel) return null;
       if (!/\.\w+$/.test(rel)) rel += ".typ";
       try {
         await api.createFile(rel);
         await refreshFiles();
         if (rel.endsWith(".typ") || /\.(bib|csv|txt|md|json|yml|yaml|toml)$/.test(rel)) openFile(rel);
+        return rel;
       } catch (e) {
         showToast({ text: String(e), kind: "error" });
+        return null;
       }
     },
     [openFile, refreshFiles, showToast],
   );
 
+  /** Renames or moves a file or folder; keeps open file, main file and editor state in sync. */
   const renameFile = useCallback(
-    async (from: string, to: string) => {
-      to = to.trim();
-      if (!to || to === from) return;
+    async (from: string, to: string): Promise<boolean> => {
+      to = to.trim().replace(/^\/+|\/+$/g, "");
+      if (!to || to === from) return false;
+      const mapped = (p: string) => (p === from ? to : p.startsWith(from + "/") ? to + p.slice(from.length) : null);
       try {
         await flushSave();
         await api.renameFile(from, to);
-        editor.current?.forgetFile(from);
+        for (const f of files) if (mapped(f.path)) editor.current?.forgetFile(f.path);
         await refreshFiles();
-        if (from === main) setMainFile(to);
-        if (from === currentRef.current) {
+        const newMain = mapped(main);
+        if (newMain) setMainFile(newMain);
+        const cur = currentRef.current;
+        const newCur = cur ? mapped(cur) : null;
+        if (newCur) {
           setCurrent(null);
           currentRef.current = null;
-          openFile(to);
+          openFile(newCur);
         }
+        return true;
       } catch (e) {
         showToast({ text: String(e), kind: "error" });
+        return false;
       }
     },
-    [flushSave, main, openFile, refreshFiles, setMainFile, showToast],
+    [files, flushSave, main, openFile, refreshFiles, setMainFile, showToast],
   );
 
   const insertImages = useCallback(
@@ -785,7 +792,7 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
   // ---------- Palette ----------
 
   const paletteItems = useMemo((): PaletteItem[] => {
-    const fileItems: PaletteItem[] = files.map((f) => ({
+    const fileItems: PaletteItem[] = files.filter((f) => f.kind !== "dir").map((f) => ({
       id: "file:" + f.path,
       label: f.path,
       group: "Dateien",
@@ -890,7 +897,8 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
         icon: <Icon.star />,
         run: () => setSaveTpl({ name: project.name, description: "" }),
       },
-      { id: "new-file", label: "Neue Datei …", group: "Aktionen", icon: <Icon.plus />, run: () => setNewFile("") },
+      { id: "new-file", label: "Neue Datei …", group: "Aktionen", icon: <Icon.plus />, run: () => requestTree("file") },
+      { id: "new-dir", label: "Neuer Ordner …", keywords: "ordner verzeichnis", group: "Aktionen", icon: <Icon.folder />, run: () => requestTree("dir") },
       {
         id: "finder",
         label: "Projektordner im Finder zeigen",
@@ -967,37 +975,83 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
   const outline = useMemo(() => outlineOf(text), [text]);
   const firstError = errors[0];
 
-  const tree = useMemo(() => {
-    // Group files by top-level folder.
-    const rows: { type: "dir" | "file"; path: string; name: string; depth: number; entry?: FileEntry }[] = [];
-    const seenDirs = new Set<string>();
-    for (const f of files) {
-      const parts = f.path.split("/");
-      for (let i = 0; i < parts.length - 1; i++) {
-        const dir = parts.slice(0, i + 1).join("/");
-        if (!seenDirs.has(dir)) {
-          seenDirs.add(dir);
-          const parentCollapsed = [...collapsed].some((c) => dir.startsWith(c + "/"));
-          if (!parentCollapsed) rows.push({ type: "dir", path: dir, name: parts[i], depth: i });
-        }
-      }
-      const hidden = [...collapsed].some((c) => f.path.startsWith(c + "/"));
-      if (!hidden) rows.push({ type: "file", path: f.path, name: parts[parts.length - 1], depth: parts.length - 1, entry: f });
-    }
-    return rows;
-  }, [files, collapsed]);
 
-  const fileMenu = (e: React.MouseEvent, f: FileEntry) => {
-    e.preventDefault();
-    const items: Menu["items"] = [];
-    if (f.kind === "typ" && f.path !== main) items.push({ label: "Als Hauptdatei festlegen", run: () => setMainFile(f.path) });
-    if (f.kind === "image") items.push({ label: "Als Abbildung einfügen", run: () => insertImages([f.path]) });
-    if (f.kind === "pdf" || f.kind === "image") items.push({ label: "In Vorschau öffnen", run: () => api.absolutePath(f.path).then(openPath) });
-    items.push({ label: "Umbenennen", run: () => setRenaming(f.path) });
-    items.push("sep");
-    items.push({ label: "Im Finder zeigen", run: () => api.absolutePath(f.path).then(revealItemInDir) });
-    setMenu({ x: e.clientX, y: e.clientY, items });
-  };
+  /** Path of `rel` as it would be written in the current file (`#image(…)`, `#include …`). */
+  const pathFromCurrent = useCallback((rel: string) => {
+    const from = (currentRef.current ?? main).split("/").slice(0, -1);
+    const to = rel.split("/");
+    let k = 0;
+    while (k < from.length && k < to.length - 1 && from[k] === to[k]) k++;
+    return [...Array(from.length - k).fill(".."), ...to.slice(k)].join("/");
+  }, [main]);
+
+  const treeActions: TreeActions = useMemo(
+    () => ({
+      open: (rel) => openFile(rel),
+      insertImage: (rel) => insertImages([rel]),
+      setMain: (rel) => setMainFile(rel),
+      openExternal: (rel) => void api.absolutePath(rel).then(openPath),
+      reveal: (rel) => (rel ? void api.absolutePath(rel).then(revealItemInDir) : void openPath(project.root)),
+      copyPath: (rel) => {
+        const p = pathFromCurrent(rel);
+        void navigator.clipboard.writeText(p).then(() => showToast({ text: `Pfad kopiert: ${p}` }, 2000));
+      },
+      createFile,
+      createDir: async (rel) => {
+        try {
+          await api.createDir(rel.trim().replace(/^\/+|\/+$/g, ""));
+          await refreshFiles();
+          return true;
+        } catch (e) {
+          showToast({ text: String(e), kind: "error" });
+          return false;
+        }
+      },
+      rename: renameFile,
+      duplicate: async (rel) => {
+        try {
+          const copy = await api.duplicateFile(rel);
+          await refreshFiles();
+          return copy;
+        } catch (e) {
+          showToast({ text: String(e), kind: "error" });
+          return null;
+        }
+      },
+      trash: async (rel) => {
+        const inside = (p: string) => p === rel || p.startsWith(rel + "/");
+        if (inside(main)) {
+          showToast({ text: "Die Hauptdatei kann nicht gelöscht werden. Lege zuerst eine andere .typ-Datei als Hauptdatei fest.", kind: "error" }, 5000);
+          return;
+        }
+        try {
+          await flushSave();
+          const trashed = await api.trashFile(rel);
+          for (const f of files) if (inside(f.path)) editor.current?.forgetFile(f.path);
+          if (currentRef.current && inside(currentRef.current)) {
+            setCurrent(null);
+            currentRef.current = null;
+            openFile(main);
+          }
+          await refreshFiles();
+          const name = rel.split("/").pop();
+          showToast(
+            {
+              text: `„${name}“ liegt im Papierkorb`,
+              actions: trashed
+                ? [{ label: "Rückgängig", run: () => void api.restoreFile(trashed, rel).then(refreshFiles, (e) => showToast({ text: String(e), kind: "error" })) }]
+                : undefined,
+            },
+            7000,
+          );
+        } catch (e) {
+          showToast({ text: String(e), kind: "error" });
+        }
+      },
+      showMenu: (x, y, items) => setMenu({ x, y, items }),
+    }),
+    [createFile, files, flushSave, insertImages, main, openFile, pathFromCurrent, project.root, refreshFiles, renameFile, setMainFile, showToast],
+  );
 
   return (
     <div className="workspace" onClick={() => menu && setMenu(null)}>
@@ -1075,90 +1129,7 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
       <div className="panes" ref={panes}>
         {settings.sidebar && (
           <aside className="sidebar">
-            <div className="sidebar-head">
-              <span>Dateien</span>
-              <button className="icon-btn" title="Neue Datei" onClick={() => setNewFile("")}>
-                <Icon.plus />
-              </button>
-            </div>
-            <div className="tree">
-              {newFile != null && (
-                <div className="tree-row">
-                  <Icon.typ />
-                  <input
-                    autoFocus
-                    placeholder="name.typ"
-                    value={newFile}
-                    onChange={(e) => setNewFile(e.target.value)}
-                    onBlur={() => setNewFile(null)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        createFile(newFile);
-                        setNewFile(null);
-                      }
-                      if (e.key === "Escape") setNewFile(null);
-                    }}
-                  />
-                </div>
-              )}
-              {tree.map((row) =>
-                row.type === "dir" ? (
-                  <div
-                    key={"d:" + row.path}
-                    className="tree-row"
-                    style={{ paddingLeft: 8 + row.depth * 14 }}
-                    onClick={() =>
-                      setCollapsed((c) => {
-                        const n = new Set(c);
-                        if (n.has(row.path)) n.delete(row.path);
-                        else n.add(row.path);
-                        return n;
-                      })
-                    }
-                  >
-                    {collapsed.has(row.path) ? <Icon.folder /> : <Icon.folderOpen />}
-                    <span className="name">{row.name}</span>
-                  </div>
-                ) : renaming === row.path ? (
-                  <div key={row.path} className="tree-row" style={{ paddingLeft: 8 + row.depth * 14 }}>
-                    {fileIcon(row.entry!.kind)}
-                    <input
-                      autoFocus
-                      defaultValue={row.path}
-                      onBlur={() => setRenaming(null)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          renameFile(row.path, e.currentTarget.value);
-                          setRenaming(null);
-                        }
-                        if (e.key === "Escape") setRenaming(null);
-                      }}
-                    />
-                  </div>
-                ) : (
-                  <div
-                    key={row.path}
-                    className={"tree-row" + (row.path === current ? " active" : "")}
-                    style={{ paddingLeft: 8 + row.depth * 14 }}
-                    title={row.path}
-                    onClick={() => {
-                      const k = row.entry!.kind;
-                      if (k === "typ" || k === "text") openFile(row.path);
-                    }}
-                    onDoubleClick={() => {
-                      const k = row.entry!.kind;
-                      if (k === "image") insertImages([row.path]);
-                      if (k === "pdf" || k === "other") api.absolutePath(row.path).then(openPath);
-                    }}
-                    onContextMenu={(e) => fileMenu(e, row.entry!)}
-                  >
-                    {fileIcon(row.entry!.kind)}
-                    <span className="name">{row.name}</span>
-                    {row.path === main && <span className="badge">main</span>}
-                  </div>
-                ),
-              )}
-            </div>
+            <FileTree projectRoot={project.root} files={files} current={current} main={main} actions={treeActions} request={treeRequest} />
             {outline.length > 0 && (
               <div className="outline">
                 <div className="sidebar-head" style={{ paddingLeft: 8 }}>
@@ -1415,13 +1386,21 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
       )}
 
       {menu && (
-        <div className="menu" style={{ left: menu.x, top: menu.y }} onClick={(e) => e.stopPropagation()}>
+        <div
+          className="menu"
+          style={{
+            left: Math.min(menu.x, window.innerWidth - 250),
+            top: Math.max(8, Math.min(menu.y, window.innerHeight - 16 - menu.items.reduce((h, it) => h + (it === "sep" ? 11 : 28), 10))),
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
           {menu.items.map((it, i) =>
             it === "sep" ? (
               <hr key={i} />
             ) : (
               <button
                 key={i}
+                className={it.danger ? "danger" : undefined}
                 onClick={() => {
                   setMenu(null);
                   it.run();

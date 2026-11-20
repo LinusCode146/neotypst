@@ -11,12 +11,20 @@ const templates = [
 ];
 
 const now = Date.now() / 1000;
-const files = [
+let files: { path: string; kind: string }[] = [
   { path: "main.typ", kind: "typ" },
   { path: "assets/schiefe-ebene.png", kind: "image" },
   { path: "out/main.pdf", kind: "pdf" },
   { path: "templates/arbeitsblatt.typ", kind: "typ" },
+  { path: "assets", kind: "dir" },
+  { path: "out", kind: "dir" },
+  { path: "templates", kind: "dir" },
 ];
+const kindOf = (p: string) =>
+  /\.typ$/.test(p) ? "typ" : /\.(png|jpe?g|svg|gif|webp)$/i.test(p) ? "image" : /\.pdf$/.test(p) ? "pdf" : /\.(bib|csv|txt|md|json|ya?ml|toml)$/.test(p) ? "text" : "other";
+const exists = (p: string) => files.some((f) => f.path === p);
+const under = (p: string, dir: string) => p === dir || p.startsWith(dir + "/");
+const trash = new Map<string, { path: string; kind: string }[]>();
 
 const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
   projects_dir: () => "/Users/du/Documents/Typst",
@@ -33,6 +41,42 @@ const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
   open_project: () => ({ root: "/p/1", name: "Physik Blatt 3 – Kinematik", main: "main.typ", files }),
   close_project: () => null,
   list_files: () => files,
+  create_file: ({ rel }) => {
+    if (exists(rel as string)) throw "Datei existiert bereits";
+    files = [...files, { path: rel as string, kind: kindOf(rel as string) }];
+    return null;
+  },
+  create_dir: ({ rel }) => {
+    if (exists(rel as string)) throw "Ordner existiert bereits";
+    files = [...files, { path: rel as string, kind: "dir" }];
+    return null;
+  },
+  rename_file: ({ from, to }) => {
+    if (exists(to as string)) throw "Ziel existiert bereits";
+    const f = from as string;
+    files = files.map((e) => (under(e.path, f) ? { ...e, path: (to as string) + e.path.slice(f.length) } : e));
+    return null;
+  },
+  duplicate_file: ({ rel }) => {
+    const r = rel as string;
+    const m = /^(.*?)(\.[^./]+)?$/.exec(r)!;
+    let n = 1;
+    let t = "";
+    do t = `${m[1]} kopie${n > 1 ? " " + n : ""}${m[2] ?? ""}`, n++; while (exists(t));
+    files = [...files, ...files.filter((e) => under(e.path, r)).map((e) => ({ ...e, path: t + e.path.slice(r.length) }))];
+    return t;
+  },
+  trash_file: ({ rel }) => {
+    const id = "/Users/du/.Trash/" + rel + "-" + Date.now();
+    trash.set(id, files.filter((e) => under(e.path, rel as string)));
+    files = files.filter((e) => !under(e.path, rel as string));
+    return id;
+  },
+  restore_file: ({ trashed }) => {
+    files = [...files, ...(trash.get(trashed as string) ?? [])];
+    return null;
+  },
+  absolute_path: ({ rel }) => "/Users/du/Documents/Typst/Physik/" + rel,
   read_file: () => fixture.main,
   write_file: () => null,
   compile: () => fixture.compile,

@@ -106,6 +106,18 @@ impl EditorWorld {
         }
     }
 
+    /// Drops all buffers at or below a path (after a folder was moved or deleted).
+    pub fn drop_buffers_under(&mut self, rel: &str) {
+        let prefix = format!("{}/", rel.trim_end_matches('/'));
+        self.files.loader_mut().overlay.retain(|id, _| match id.root() {
+            VirtualRoot::Project => {
+                let p = id.vpath().get_without_slash();
+                p != rel && !p.starts_with(&prefix)
+            }
+            _ => true,
+        });
+    }
+
     /// Prepare for a new compilation: re-read changed files, refresh the clock.
     pub fn reset(&mut self) {
         self.files.reset();

@@ -191,7 +191,9 @@ impl Engine {
     }
 
     pub fn drop_buffer(&mut self, rel: String) -> Result<(), String> {
-        self.session()?.world.drop_buffer(&rel);
+        let world = &mut self.session()?.world;
+        world.drop_buffer(&rel);
+        world.drop_buffers_under(&rel);
         Ok(())
     }
 

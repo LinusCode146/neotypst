@@ -134,6 +134,29 @@ async fn rename_file(state: State<'_, AppState>, from: String, to: String) -> Re
 }
 
 #[tauri::command]
+fn create_dir(state: State<'_, AppState>, rel: String) -> Result<(), String> {
+    project::create_dir(&state.root()?, &rel)
+}
+
+#[tauri::command]
+fn duplicate_file(state: State<'_, AppState>, rel: String) -> Result<String, String> {
+    project::duplicate(&state.root()?, &rel)
+}
+
+/// Moves a file or folder to the Trash; returns its path there (for undo).
+#[tauri::command]
+async fn trash_file(state: State<'_, AppState>, rel: String) -> Result<String, String> {
+    let trashed = project::trash(&state.root()?, &rel)?;
+    state.engine.run(move |e| e.drop_buffer(rel)).await?;
+    Ok(trashed)
+}
+
+#[tauri::command]
+fn restore_file(state: State<'_, AppState>, trashed: String, rel: String) -> Result<(), String> {
+    project::restore(&state.root()?, &trashed, &rel)
+}
+
+#[tauri::command]
 fn import_files(state: State<'_, AppState>, paths: Vec<String>, subdir: String) -> Result<Vec<String>, String> {
     project::import_files(&state.root()?, &paths, &subdir)
 }
@@ -297,6 +320,10 @@ pub fn run() {
             create_file,
             rename_file,
             import_files,
+            create_dir,
+            duplicate_file,
+            trash_file,
+            restore_file,
             absolute_path,
             compile,
             set_main,
