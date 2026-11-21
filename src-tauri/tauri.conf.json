@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "NeoTypst",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "identifier": "de.neotypst.editor",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -19,16 +19,39 @@
         "minHeight": 560,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
-        "trafficLightPosition": { "x": 16, "y": 20 },
+        "trafficLightPosition": {
+          "x": 16,
+          "y": 20
+        },
         "dragDropEnabled": true
       }
     ],
-    "security": { "csp": null }
+    "security": {
+      "csp": null
+    }
   },
   "bundle": {
     "active": true,
-    "targets": ["app", "dmg"],
+    "targets": [
+      "app",
+      "dmg"
+    ],
     "category": "Productivity",
-    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.png"]
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.png"
+    ],
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEE0M0M4NkMzREY4N0Y3ODMKUldTRDk0ZmZ3NFk4cEQyVlFyaXlpZUMvRjUrSWxNM2VCd3hiVDRaNzZjOHArNEpBOVN5bzEvQ28K",
+      "endpoints": [
+        "https://github.com/LinusCode146/neotypst/releases/latest/download/latest.json"
+      ]
+    }
   }
 }

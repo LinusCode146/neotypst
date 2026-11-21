@@ -1,5 +1,6 @@
 mod bib;
 mod engine;
+mod format;
 mod graphics;
 mod project;
 mod spell;
@@ -161,6 +162,42 @@ fn import_files(state: State<'_, AppState>, paths: Vec<String>, subdir: String) 
     project::import_files(&state.root()?, &paths, &subdir)
 }
 
+/// Pasted image: raw bytes as the request body, the file name in the `x-name` header.
+#[tauri::command]
+fn save_asset(state: State<'_, AppState>, request: tauri::ipc::Request<'_>) -> Result<String, String> {
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else { return Err("Keine Bilddaten".into()) };
+    let name = request.headers().get("x-name").and_then(|v| v.to_str().ok()).unwrap_or("image.png");
+    let name = percent_decode(name);
+    project::save_asset(&state.root()?, &name, bytes)
+}
+
+/// Header values are ASCII; the frontend percent-encodes the file name.
+fn percent_decode(s: &str) -> String {
+    let b = s.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] == b'%' && i + 2 < b.len() {
+            if let Ok(v) = u8::from_str_radix(&s[i + 1..i + 3], 16) {
+                out.push(v);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(b[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+#[tauri::command]
+async fn format_typst(text: String, from: Option<usize>, to: Option<usize>, width: Option<usize>) -> Result<Option<format::Formatted>, String> {
+    let sel = from.zip(to);
+    tauri::async_runtime::spawn_blocking(move || format::format(&text, sel, width.unwrap_or(80)))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 fn absolute_path(state: State<'_, AppState>, rel: String) -> Result<String, String> {
     Ok(project::resolve(&state.root()?, &rel)?.to_string_lossy().into_owned())
@@ -306,6 +343,8 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .manage(AppState { engine: EngineHandle::spawn(), root: Mutex::new(None), previews: Default::default() })
         .invoke_handler(tauri::generate_handler![
             projects_dir,
@@ -325,6 +364,8 @@ pub fn run() {
             trash_file,
             restore_file,
             absolute_path,
+            save_asset,
+            format_typst,
             compile,
             set_main,
             set_solutions,

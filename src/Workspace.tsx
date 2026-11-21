@@ -17,6 +17,8 @@ import { FileTree, fileIcon, type MenuItem, type TreeActions } from "./FileTree"
 import { MatrixEditor, emptyMatrix, generateMatrix, parseMatrix, type MatrixGrid } from "./MatrixEditor";
 import { SymbolPalette } from "./SymbolPalette";
 import { GraphicsGallery } from "./GraphicsGallery";
+import { SearchPanel } from "./SearchPanel";
+import { beforeRestart, checkForUpdate } from "./updater";
 import { GRAPHICS, type GraphicBlock } from "./graphics";
 import type { SymbolEntry } from "./symbolData";
 
@@ -83,6 +85,14 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
     /** Not inside a formula: wrap the result in `$ … $`. */
     wrap: boolean;
   } | null>(null);
+
+  const [searchOpen, setSearchOpen] = useState<{ n: number; initial: string } | null>(null);
+  const openSearch = useCallback(() => {
+    if (!getSettings().sidebar) setSettings({ sidebar: true });
+    const sel = editor.current?.selection();
+    const picked = sel && sel.to > sel.from ? editor.current!.getText().slice(sel.from, sel.to) : "";
+    setSearchOpen((s) => ({ n: (s?.n ?? 0) + 1, initial: picked && !picked.includes("\n") ? picked : "" }));
+  }, []);
 
   const [treeRequest, setTreeRequest] = useState<{ kind: "file" | "dir"; n: number } | null>(null);
   const requestTree = useCallback((kind: "file" | "dir") => {
@@ -442,15 +452,63 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
     [files, flushSave, main, openFile, refreshFiles, setMainFile, showToast],
   );
 
+  /** Path of `rel` as it would be written in the current file (`#image(…)`, `#include …`). */
+  const pathFromCurrent = useCallback((rel: string) => {
+    const from = (currentRef.current ?? main).split("/").slice(0, -1);
+    const to = rel.split("/");
+    let k = 0;
+    while (k < from.length && k < to.length - 1 && from[k] === to[k]) k++;
+    return [...Array(from.length - k).fill(".."), ...to.slice(k)].join("/");
+  }, [main]);
+
   const insertImages = useCallback(
     (rels: string[]) => {
       const body = rels
+        .map(pathFromCurrent)
         .map((r, i) => `#figure(\n  image("${r}", width: \${${i * 2 + 1}:70%}),\n  caption: [\${${i * 2 + 2}:Beschriftung}],\n)`)
         .join("\n\n");
       editor.current?.insertSnippet(body + "\n");
     },
-    [],
+    [pathFromCurrent],
   );
+
+  /** ⌘V with an image on the clipboard: save it in assets/ and insert a figure. */
+  const pasteImages = useCallback(
+    async (images: File[]) => {
+      if (!currentRef.current?.endsWith(".typ")) return;
+      try {
+        const rels: string[] = [];
+        for (const f of images) rels.push(await api.saveAsset(f.name || "image.png", f));
+        await refreshFiles();
+        insertImages(rels);
+        showToast({ text: `Gespeichert: ${rels.join(", ")}` }, 2500);
+      } catch (e) {
+        showToast({ text: `Bild konnte nicht gespeichert werden: ${e}`, kind: "error" });
+      }
+    },
+    [insertImages, refreshFiles, showToast],
+  );
+
+  /** ⌥⇧F: format the selection, or the whole file without one. */
+  const formatDocument = useCallback(async () => {
+    const ed = editor.current;
+    const rel = currentRef.current;
+    if (!ed || !rel?.endsWith(".typ")) return;
+    const text = ed.getText();
+    const sel = ed.selection();
+    const ranged = sel.to > sel.from;
+    try {
+      const res = await api.formatTypst(text, ranged ? sel.from : undefined, ranged ? sel.to : undefined);
+      if (ed.getText() !== text) return; // typed meanwhile
+      if (!res) {
+        showToast({ text: ranged ? "Auswahl ist schon formatiert" : "Schon formatiert" }, 1500);
+        return;
+      }
+      ed.applyEdit(res.from, res.to, res.text);
+    } catch (e) {
+      showToast({ text: String(e), kind: "error" }, 4000);
+    }
+  }, [showToast]);
 
   /** Matrix editor: edits the `mat(…)`/`vec(…)` at the cursor or inserts a new one. */
   const openMatrixEditor = useCallback(async () => {
@@ -705,6 +763,12 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
     };
   }, [insertImages, refreshFiles, showToast]);
 
+  // Save open files before an update restarts the app.
+  useEffect(() => {
+    beforeRestart.add(flushSave);
+    return () => void beforeRestart.delete(flushSave);
+  }, [flushSave]);
+
   const zoom = (z: number) => setSettings({ zoom: Math.min(4, Math.max(0.25, Math.round(z * 1000) / 1000)) });
 
   // Global shortcuts.
@@ -724,6 +788,9 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
         const next = order[(order.indexOf(settings.spell as (typeof order)[number]) + 1) % order.length];
         setSettings({ spell: next });
         showToast({ text: `Rechtschreibung: ${spellLabel(next)}` }, 1500);
+      } else if (k === "f" && e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        openSearch();
       } else if (k === "b" && e.shiftKey) {
         e.preventDefault();
         setLitOpen(true);
@@ -897,6 +964,32 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
         icon: <Icon.star />,
         run: () => setSaveTpl({ name: project.name, description: "" }),
       },
+      {
+        id: "project-search",
+        label: "Im Projekt suchen und ersetzen",
+        detail: "⌘⇧F",
+        keywords: "suchen finden ersetzen replace search alle dateien",
+        group: "Aktionen",
+        icon: <Icon.search />,
+        run: openSearch,
+      },
+      {
+        id: "format",
+        label: "Dokument formatieren",
+        detail: "⌥⇧F",
+        keywords: "format formatieren aufräumen einrücken typstyle auswahl",
+        group: "Aktionen",
+        icon: <Icon.code />,
+        run: formatDocument,
+      },
+      {
+        id: "update",
+        label: "Nach Updates suchen",
+        keywords: "update version aktualisieren",
+        group: "Aktionen",
+        icon: <Icon.bolt />,
+        run: () => void checkForUpdate(true),
+      },
       { id: "new-file", label: "Neue Datei …", group: "Aktionen", icon: <Icon.plus />, run: () => requestTree("file") },
       { id: "new-dir", label: "Neuer Ordner …", keywords: "ordner verzeichnis", group: "Aktionen", icon: <Icon.folder />, run: () => requestTree("dir") },
       {
@@ -939,7 +1032,7 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
       { id: "theme-dark", label: "Design: dunkel", keywords: "theme dark", group: "Einstellungen", icon: <Icon.settings />, run: () => setSettings({ theme: "dark" }) },
     ];
     return [...actions, ...insert, ...fileItems, ...prefs];
-  }, [files, main, palette, solutions, settings, exportPdf, toggleSolutions, openFile, insertImages, onClose, project.root, openTableEditor, openMatrixEditor]);
+  }, [files, main, palette, solutions, settings, exportPdf, toggleSolutions, openFile, insertImages, onClose, project.root, openTableEditor, openMatrixEditor, openSearch, formatDocument]);
 
   const dynamicItems = useCallback((q: string): PaletteItem[] => {
     const m = q.match(/^(?:tab(?:elle)?|tbl|mat(?:rix)?)?\s*(\d{1,2})\s*[x×*]\s*(\d{1,2})$/i);
@@ -975,15 +1068,6 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
   const outline = useMemo(() => outlineOf(text), [text]);
   const firstError = errors[0];
 
-
-  /** Path of `rel` as it would be written in the current file (`#image(…)`, `#include …`). */
-  const pathFromCurrent = useCallback((rel: string) => {
-    const from = (currentRef.current ?? main).split("/").slice(0, -1);
-    const to = rel.split("/");
-    let k = 0;
-    while (k < from.length && k < to.length - 1 && from[k] === to[k]) k++;
-    return [...Array(from.length - k).fill(".."), ...to.slice(k)].join("/");
-  }, [main]);
 
   const treeActions: TreeActions = useMemo(
     () => ({
@@ -1129,8 +1213,29 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
       <div className="panes" ref={panes}>
         {settings.sidebar && (
           <aside className="sidebar">
-            <FileTree projectRoot={project.root} files={files} current={current} main={main} actions={treeActions} request={treeRequest} />
-            {outline.length > 0 && (
+            {searchOpen ? (
+              <SearchPanel
+                files={files}
+                current={current}
+                textVersion={text}
+                initialQuery={searchOpen.initial}
+                focusKey={searchOpen.n}
+                liveText={(rel) => (rel === currentRef.current ? (editor.current?.getText() ?? null) : (unsaved.current.get(rel) ?? null))}
+                open={async (rel, from, to, focusEditor) => {
+                  await openFile(rel);
+                  editor.current?.select(from, to, focusEditor);
+                }}
+                edit={editFileText}
+                notify={(msg, undo) => showToast({ text: msg, actions: undo ? [{ label: "Rückgängig", run: undo }] : undefined }, 10000)}
+                close={() => {
+                  setSearchOpen(null);
+                  editor.current?.focus();
+                }}
+              />
+            ) : (
+              <FileTree projectRoot={project.root} files={files} current={current} main={main} actions={treeActions} request={treeRequest} />
+            )}
+            {!searchOpen && outline.length > 0 && (
               <div className="outline">
                 <div className="sidebar-head" style={{ paddingLeft: 8 }}>
                   <span>Gliederung</span>
@@ -1163,6 +1268,8 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
             onGraphics={() => setGraphicsOpen(true)}
             onSpellAction={onSpellAction}
             onLiterature={() => setLitOpen(true)}
+            onPasteImage={pasteImages}
+            onFormat={formatDocument}
           />
           {showProblems && diags.length > 0 && (
             <div className="problems">

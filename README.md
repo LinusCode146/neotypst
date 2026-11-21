@@ -15,6 +15,8 @@ Tauri 2 · React · CodeMirror 6 · Typst 0.15 (direkt eingebunden, keine CLI un
 - **Rechtschreibung** Deutsch/Englisch, pro Absatz automatisch erkannt
 - **Literatur** per DOI/ISBN, Zitieren, Zitierstile
 - **PDF-Export**, auf Wunsch Schüler- und Lösungsversion in einem Schritt
+- **Screenshots einfügen** mit ⌘V, **Suchen & Ersetzen im ganzen Projekt**, **Formatieren** per Tastendruck
+- **Automatische Updates** aus den GitHub-Releases
 
 ## Voraussetzungen
 
@@ -61,6 +63,8 @@ Projekt/
 |---|---|
 | ⌘K | Befehlspalette: Befehle, Bausteine, Dateien, Einstellungen |
 | ⌘P | Datei öffnen |
+| ⌘⇧F | Im ganzen Projekt suchen und ersetzen |
+| ⌥⇧F | Formatieren (Auswahl, sonst die ganze Datei) |
 | ⌘⇧B | Literatur & Zitate (DOI/ISBN nachschlagen, zitieren, Zitierstil) |
 | ⌥⌘L | Rechtschreibung: Automatisch → Deutsch → Englisch |
 | ⌘⇧G | Grafik einfügen (Koordinatensystem, Plots, Kräfte, Stromkreis, Flussdiagramm …) |
@@ -86,10 +90,28 @@ Ein Klick in die Vorschau springt zur passenden Stelle im Code.
 |---|---|
 | ⇧↩ | Eine Zeile tiefer springen, in der letzten Zeile eine neue anhängen (ohne Vim) |
 | ⌘↩ | Neue leere Zeile unter der aktuellen, ohne die Zeile zu teilen |
+| ⌘V mit Bild | Speichert es in `assets/` und fügt eine Abbildung ein (siehe unten) |
 | `$` | Setzt `$$` mit dem Cursor dazwischen |
 | Leerzeichen zwischen `$$` | `$ \| $`, also eine abgesetzte Formel; ⌫ macht es rückgängig |
 
 Der **Vim-Modus** lässt sich in der Befehlspalette (⌘K → „Vim-Modus einschalten“) aktivieren, `:w` speichert.
+
+## Bilder einfügen (⌘V)
+
+Liegt ein Bild in der Zwischenablage, legt ⌘V es in `assets/` ab und fügt `#figure(image(…), caption: […])` ein. Das gilt für einen Screenshot (⌘⇧⌃4), ein im Browser kopiertes Bild oder eine im Finder kopierte Bilddatei. Bilder ohne echten Namen heißen `bild-1.png`, `bild-2.png` …, sonst bleibt der Dateiname. Der Pfad wird relativ zur aktuellen Datei geschrieben, funktioniert also auch in Unterordnern. Wer aus Numbers oder Excel kopiert, bekommt wie gewohnt den Text, nicht das mitkopierte Bild der Zellen.
+
+## Suchen & Ersetzen im Projekt (⌘⇧F)
+
+Die Seitenleiste zeigt alle Treffer in `.typ`-, `.bib`-, `.csv`- und Textdateien, nach Datei gruppiert (`out/` ausgenommen). Markierter Text wird als Suchbegriff übernommen.
+
+- **Optionen:** `Aa` Groß-/Kleinschreibung, `W` nur ganze Wörter, `.*` regulärer Ausdruck (im Ersetzen-Feld dann `$1` für Gruppen)
+- **↩ / ⇧↩** springen zum nächsten / vorherigen Treffer, ein Klick öffnet die Stelle
+- **Ersetzen:** Der Pfeil links blendet das Ersetzen-Feld ein, die Treffer zeigen dann eine Vorschau. Ersetzen geht einzeln, pro Datei oder mit „Alle“ (⌘↩). „Rückgängig“ in der Meldung stellt alle betroffenen Dateien wieder her.
+- Esc schließt die Suche, der Dateibaum ist dann wieder da.
+
+## Formatieren (⌥⇧F)
+
+Räumt den Typst-Code auf: Einrückung, Abstände um `=` und nach Kommas, lange Funktionsaufrufe auf mehrere Zeilen. Fließtext wird nicht umgebrochen. Mit Auswahl wird nur der kleinste vollständige Ausdruck darum formatiert. Die Arbeit macht [typstyle](https://github.com/typstyle-rs/typstyle), eingebunden wie Typst selbst. Geändert werden nur die betroffenen Zeilen, der Cursor bleibt also, wo er war, und ⌘Z nimmt alles in einem Schritt zurück. Bei Syntaxfehlern im Dokument wird nicht formatiert.
 
 ## Bausteine (Abkürzung + Tab)
 
@@ -201,13 +223,27 @@ Beim Export „Aufgaben + Lösungen“ (⌘⇧E) entstehen `main.pdf` und `main-
 #if loesungen [Musterlösung: …]
 ```
 
+## Updates
+
+Etwa vier Sekunden nach dem Start fragt NeoTypst bei GitHub nach einer neuen Version. Gibt es eine, erscheint unten rechts eine Karte mit „Installieren“. Danach startet „Jetzt neu starten“ die neue Version, offene Dateien werden vorher gespeichert. Von Hand geht es über ⌘K → „Nach Updates suchen“. Im Entwicklungsmodus wird nicht automatisch gesucht.
+
+Die Update-Pakete sind mit einem eigenen Schlüssel signiert. Die App installiert nur Pakete, die zum öffentlichen Schlüssel in `tauri.conf.json` passen.
+
+### Ein Release veröffentlichen
+
+1. Version in `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` und `package.json` erhöhen
+2. Release-Notizen nach `release-notes/vX.Y.Z.md` schreiben (sie erscheinen auch in der Update-Karte)
+3. `scripts/release.sh` ausführen. Das Skript baut die Universal-App, signiert das Update-Paket mit `~/.tauri/neotypst.key` und lädt DMG, `NeoTypst.app.tar.gz` und `latest.json` als GitHub-Release hoch.
+
+Der private Schlüssel `~/.tauri/neotypst.key` gehört nicht ins Repository. Geht er verloren, können bestehende Installationen keine Updates mehr annehmen. Bewahre also eine Sicherungskopie auf, etwa im Passwortmanager.
+
 ## Tests
 
 ```bash
 cd src-tauri && cargo test --lib
 ```
 
-Die Tests prüfen unter anderem, dass jede Vorlage, jeder Grafik-Baustein, jeder Zitierstil und jede erzeugte Tabelle fehlerfrei kompiliert. Außerdem testen sie Autovervollständigung, Klick-Sprung, das Einlesen von Tabellen und Matrizen, die Erkennung von Text in Formeln und die Rechtschreibprüfung (mit dem echten macOS-Wörterbuch). Tests, die ins Netz gehen, sind mit `#[ignore]` markiert (`cargo test --lib -- --ignored`).
+Die Tests prüfen unter anderem, dass jede Vorlage, jeder Grafik-Baustein, jeder Zitierstil und jede erzeugte Tabelle fehlerfrei kompiliert. Außerdem testen sie Autovervollständigung, Klick-Sprung, das Einlesen von Tabellen und Matrizen, die Erkennung von Text in Formeln, das Formatieren, die Namen eingefügter Bilder und die Rechtschreibprüfung (mit dem echten macOS-Wörterbuch). Tests, die ins Netz gehen, sind mit `#[ignore]` markiert (`cargo test --lib -- --ignored`).
 
 ## Lizenz
 

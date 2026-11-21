@@ -55,6 +55,12 @@ export type EditorHandle = {
   /** Inserts text at `pos` without moving the cursor (except by mapping). */
   insertAtKeepCursor(pos: number, text: string): void;
   replaceRangeKeepCursor(from: number, to: number, text: string): void;
+  /** Main selection range. */
+  selection(): { from: number; to: number };
+  /** Selects a range and scrolls it to the middle. */
+  select(from: number, to: number, focus?: boolean): void;
+  /** Replaces `[from, to)` line by line, so the cursor stays where lines are unchanged. */
+  applyEdit(from: number, to: number, text: string): void;
 };
 
 export type EditorCommand = "bold" | "italic" | "math" | "displayMath" | "convertTable" | "comment" | "complete";
@@ -70,6 +76,8 @@ type Props = {
   onGraphics(): void;
   onSpellAction(action: "learn" | "project" | "ignore", word: string): void;
   onLiterature(): void;
+  onPasteImage(files: File[]): void;
+  onFormat(): void;
 };
 
 const vimCompartment = new Compartment();
@@ -140,6 +148,78 @@ function quoteWord(v: EditorView, from: number, to: number, joinOnly = false): b
 /** Number of unescaped `"` in a string — odd means we are inside a string literal. */
 const quoteCount = (s: string) => (s.match(/(?<!\\)"/g) ?? []).length;
 
+const IMAGE_NAME = /^[^\n/]+\.(png|jpe?g|gif|webp|svg|tiff?|heic)$/i;
+
+/**
+ * Images on the clipboard (screenshot, copied image, image file from Finder).
+ * Text wins when real text comes along — Numbers/Excel put a picture of the cells there too.
+ */
+export function clipboardImages(data: DataTransfer | null): File[] {
+  if (!data) return [];
+  const files = [...data.files].filter((f) => f.type.startsWith("image/"));
+  if (!files.length) return [];
+  const text = data.getData("text/plain");
+  if (text && !text.split("\n").every((l) => !l.trim() || IMAGE_NAME.test(l.trim().split("/").pop()!))) return [];
+  return files;
+}
+
+/** Line-level changes turning `a` into `b` (LCS); falls back to one change for huge inputs. */
+export function lineChanges(a: string, b: string, offset: number): { from: number; to: number; insert: string }[] {
+  const A = a.split("\n");
+  const B = b.split("\n");
+  let pre = 0;
+  while (pre < A.length && pre < B.length && A[pre] === B[pre]) pre++;
+  let suf = 0;
+  while (suf < A.length - pre && suf < B.length - pre && A[A.length - 1 - suf] === B[B.length - 1 - suf]) suf++;
+  const a2 = A.slice(pre, A.length - suf);
+  const b2 = B.slice(pre, B.length - suf);
+  const lineStart = (lines: string[], i: number) => lines.slice(0, i).reduce((n, l) => n + l.length + 1, 0);
+  const base = offset + lineStart(A, pre);
+  const n = a2.length;
+  const m = b2.length;
+  // The line walk below needs a common last line (every changed line ends in "\n").
+  if (suf === 0 || n * m > 4_000_000) {
+    let p = 0;
+    while (p < a.length && p < b.length && a[p] === b[p]) p++;
+    let q = 0;
+    while (q < a.length - p && q < b.length - p && a[a.length - 1 - q] === b[b.length - 1 - q]) q++;
+    if (p === a.length && p === b.length) return [];
+    return [{ from: offset + p, to: offset + a.length - q, insert: b.slice(p, b.length - q) }];
+  }
+  // LCS table over the differing middle.
+  const dp = new Int32Array((n + 1) * (m + 1));
+  for (let i = n - 1; i >= 0; i--)
+    for (let j = m - 1; j >= 0; j--)
+      dp[i * (m + 1) + j] = a2[i] === b2[j] ? dp[(i + 1) * (m + 1) + j + 1] + 1 : Math.max(dp[(i + 1) * (m + 1) + j], dp[i * (m + 1) + j + 1]);
+  const out: { from: number; to: number; insert: string }[] = [];
+  let i = 0;
+  let j = 0;
+  let pos = base; // start of line a2[i] in the old document
+  let cur: { from: number; to: number; ins: string[] } | null = null;
+  const flush = () => {
+    if (cur) out.push({ from: cur.from, to: cur.to, insert: cur.ins.map((l) => l + "\n").join("") });
+    cur = null;
+  };
+  while (i < n || j < m) {
+    if (i < n && j < m && a2[i] === b2[j]) {
+      flush();
+      pos += a2[i].length + 1;
+      i++;
+      j++;
+    } else if (j < m && (i === n || dp[i * (m + 1) + j + 1] >= dp[(i + 1) * (m + 1) + j])) {
+      cur ??= { from: pos, to: pos, ins: [] };
+      cur.ins.push(b2[j++]);
+    } else {
+      cur ??= { from: pos, to: pos, ins: [] };
+      pos += a2[i].length + 1;
+      cur.to = pos;
+      i++;
+    }
+  }
+  flush();
+  return out;
+}
+
 const typstLanguageData = EditorState.languageData.of(() => [
   {
     closeBrackets: { brackets: ["(", "[", "{", '"', "$"] },
@@ -183,6 +263,15 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(props, ref
     search({ top: true }),
     typstLanguageData,
     mathSpace,
+    EditorView.domEventHandlers({
+      paste(e) {
+        const images = clipboardImages(e.clipboardData);
+        if (!images.length) return false;
+        e.preventDefault();
+        propsRef.current.onPasteImage(images);
+        return true;
+      },
+    }),
     typstHighlight,
     autocompletion({
       override: [typstSource(() => rel.current), snippetSource],
@@ -205,6 +294,7 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(props, ref
         { key: "Mod-Shift-g", run: () => (propsRef.current.onGraphics(), true) },
         { key: "Mod-Shift-b", run: () => (propsRef.current.onLiterature(), true) },
         { key: "Ctrl-Space", run: startCompletion },
+        { key: "Shift-Alt-f", run: () => (propsRef.current.onFormat(), true) },
         { key: "Shift-Enter", run: lineDownOrAppend },
         { key: "Backspace", run: mathSpaceBackspace },
       ]),
@@ -471,6 +561,24 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(props, ref
     },
     charBefore(pos) {
       return view.current?.state.sliceDoc(Math.max(0, pos - 1), pos) ?? "";
+    },
+    selection() {
+      const m = view.current?.state.selection.main;
+      return { from: m?.from ?? 0, to: m?.to ?? 0 };
+    },
+    select(from, to, focus = true) {
+      const v = view.current!;
+      const len = v.state.doc.length;
+      const a = Math.min(from, len);
+      const b = Math.min(to, len);
+      suppressCursor.current = true;
+      v.dispatch({ selection: EditorSelection.range(a, b), effects: EditorView.scrollIntoView(a, { y: "center" }) });
+      if (focus) v.focus();
+    },
+    applyEdit(from, to, text) {
+      const v = view.current!;
+      const changes = lineChanges(v.state.sliceDoc(from, to), text, from);
+      if (changes.length) v.dispatch({ changes, userEvent: "input.format", scrollIntoView: false });
     },
   }));
 

@@ -2386,3 +2386,270 @@ kbd.on-primary {
 .menu button.danger {
   color: var(--danger);
 }
+
+/* ---------- Projektsuche ---------- */
+
+.search-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.search-panel .sidebar-head .icon-btn {
+  font-size: 16px;
+  line-height: 1;
+}
+.search-fields {
+  display: flex;
+  align-items: flex-start;
+  padding: 0 8px 0 2px;
+  gap: 2px;
+}
+.search-inputs {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.search-inputs .tree-search {
+  margin: 0;
+  padding-right: 2px;
+  gap: 1px;
+}
+.tree-search.invalid {
+  border-color: var(--danger);
+}
+.twisty-btn {
+  width: 18px;
+  height: 26px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: none;
+  background: none;
+  color: var(--muted);
+  border-radius: 4px;
+  padding: 0;
+}
+.twisty-btn:hover {
+  color: var(--text);
+}
+.twisty-btn svg {
+  width: 11px;
+  height: 11px;
+  transition: transform 0.12s;
+}
+.twisty-btn.open svg {
+  transform: rotate(90deg);
+}
+.tree-search .opt {
+  flex: none;
+  min-width: 21px;
+  height: 20px;
+  padding: 0 4px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+}
+.tree-search .opt:hover:not(:disabled) {
+  background: var(--line);
+  color: var(--text);
+}
+.tree-search .opt.on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.tree-search .opt:disabled {
+  opacity: 0.4;
+}
+.search-summary {
+  padding: 7px 14px 5px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.search-summary .err {
+  color: var(--danger);
+}
+.search-results {
+  flex: 1;
+  overflow: auto;
+  padding: 0 6px 10px;
+  font-size: 12.5px;
+}
+.search-file-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 4px;
+  border-radius: 5px;
+  cursor: default;
+  user-select: none;
+}
+.search-file-head:hover {
+  background: var(--line);
+}
+.search-file-head .twisty {
+  width: 12px;
+  display: grid;
+  place-items: center;
+}
+.search-file-head .twisty svg {
+  width: 11px;
+  height: 11px;
+  opacity: 0.6;
+  transition: transform 0.12s;
+}
+.search-file-head .twisty.open svg {
+  transform: rotate(90deg);
+}
+.search-file-head .name {
+  font-weight: 500;
+  white-space: nowrap;
+}
+.search-file-head .dir {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+.search-file-head .count {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--line);
+  color: var(--text-2);
+  font-size: 10.5px;
+  text-align: center;
+}
+.search-hit {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 3px 4px 3px 22px;
+  border-radius: 5px;
+  cursor: default;
+  color: var(--text-2);
+}
+.search-hit:hover {
+  background: var(--line);
+}
+.search-hit.active {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+.search-hit .ln {
+  flex: none;
+  min-width: 18px;
+  color: var(--muted);
+  font-size: 10.5px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.search-hit .snip {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono, ui-monospace, Menlo, monospace);
+  font-size: 11.5px;
+}
+.search-hit mark {
+  background: rgba(255, 196, 0, 0.35);
+  color: var(--text);
+  border-radius: 2px;
+}
+.search-hit mark.strike {
+  background: rgba(196, 49, 75, 0.16);
+  text-decoration: line-through;
+}
+.search-hit ins {
+  background: rgba(47, 133, 90, 0.18);
+  color: var(--text);
+  text-decoration: none;
+  border-radius: 2px;
+}
+.row-action {
+  flex: none;
+  display: none;
+  border: none;
+  background: none;
+  color: var(--muted);
+  padding: 0 3px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+.search-hit:hover .row-action,
+.search-file-head:hover .row-action {
+  display: block;
+}
+.row-action:hover {
+  background: var(--line-strong);
+  color: var(--text);
+}
+
+/* ---------- Update ---------- */
+
+.update-card {
+  position: fixed;
+  right: 16px;
+  bottom: 40px;
+  z-index: 90;
+  width: 300px;
+  padding: 14px 16px 12px;
+  border-radius: 12px;
+  background: var(--raised);
+  border: 1px solid var(--line-strong);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+  font-size: 13px;
+}
+.update-title {
+  font-weight: 600;
+}
+.update-note {
+  margin-top: 4px;
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.update-actions {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.update-bar {
+  margin-top: 10px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--line);
+  overflow: hidden;
+}
+.update-bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.2s;
+}
+.update-bar span.indeterminate {
+  animation: update-slide 1.2s ease-in-out infinite;
+}
+@keyframes update-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(260%);
+  }
+}

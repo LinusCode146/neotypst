@@ -161,6 +161,25 @@ const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
     cells: ["$s$ in m", "$0$", "", ""],
     extra: [],
   }),
+  save_asset: (args) => {
+    let n = 1;
+    while (exists(`assets/bild-${n}.png`)) n++;
+    const rel = `assets/bild-${n}.png`;
+    files = [...files, { path: rel, kind: "image" }];
+    console.info("[mock] save_asset", (args as unknown as Uint8Array).length, "bytes →", rel);
+    return rel;
+  },
+  // Rough stand-in for typstyle: spaces around `=` in #let and after commas in calls.
+  format_typst: ({ text, from, to }) => {
+    const t = text as string;
+    const [a, b] = from != null && to != null ? [from as number, to as number] : [0, t.length];
+    const out = t
+      .slice(a, b)
+      .split("\n")
+      .map((l) => l.replace(/\s+$/, "").replace(/^(#let [\w-]+(?:\([^)]*\))?)\s*=\s*/, "$1 = ").replace(/,(?=\S)/g, ", "))
+      .join("\n");
+    return out === t.slice(a, b) ? null : { from: a, to: b, text: out };
+  },
   "plugin:event|listen": () => 1,
   "plugin:event|unlisten": () => null,
 };

@@ -63,6 +63,11 @@ export const api = {
   restoreFile: (trashed: string, rel: string) => invoke<void>("restore_file", { trashed, rel }),
   importFiles: (paths: string[], subdir = "assets") => invoke<string[]>("import_files", { paths, subdir }),
   absolutePath: (rel: string) => invoke<string>("absolute_path", { rel }),
+  /** Saves pasted image bytes in assets/; returns the project-relative path. */
+  saveAsset: async (name: string, data: Blob) =>
+    invoke<string>("save_asset", new Uint8Array(await data.arrayBuffer()), { headers: { "x-name": encodeURIComponent(name) } }),
+  formatTypst: (text: string, from?: number, to?: number, width?: number) =>
+    invoke<{ from: number; to: number; text: string } | null>("format_typst", { text, from, to, width }),
 
   compile: (rel?: string, text?: string) => invoke<CompileOut>("compile", { rel, text }),
   setMain: (rel: string) => invoke<void>("set_main", { rel }),

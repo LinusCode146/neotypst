@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, type OpenedProject } from "./api";
 import { Hub } from "./Hub";
 import { Workspace } from "./Workspace";
+import { UpdateCard, scheduleUpdateCheck } from "./updater";
 
 const LAST = "neotypst.lastProject";
 
@@ -22,6 +23,8 @@ export function App() {
     }
   }, []);
 
+  useEffect(scheduleUpdateCheck, []);
+
   // Reopen the last project on launch.
   useEffect(() => {
     const last = localStorage.getItem(LAST);
@@ -36,10 +39,17 @@ export function App() {
   }, []);
 
   if (booting) return null;
-  if (project) return <Workspace key={project.root} project={project} onClose={close} />;
+  if (project)
+    return (
+      <>
+        <Workspace key={project.root} project={project} onClose={close} />
+        <UpdateCard />
+      </>
+    );
   return (
     <>
       <Hub onOpen={open} />
+      <UpdateCard />
       {error && (
         <div className="toast error" onClick={() => setError(null)}>
           {error}

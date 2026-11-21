@@ -1,6 +1,6 @@
 [package]
 name = "neotypst"
-version = "0.1.0"
+version = "0.2.0"
 description = "Ein Typst-Editor für Arbeitsblätter und Dokumentationen"
 license = "MIT"
 edition = "2024"
@@ -37,6 +37,9 @@ typst-kit = { version = "0.15.1", default-features = false, features = [
     "system-downloader",
     "datetime",
 ] }
+typstyle-core = "0.15.3"
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
 
 [profile.dev.package."*"]
 opt-level = 2

@@ -311,9 +311,58 @@ pub fn import_files(root: &Path, paths: &[String], subdir: &str) -> Result<Vec<S
     Ok(out)
 }
 
+/// Saves pasted image bytes into `assets/`. Generic clipboard names ("image.png")
+/// become `bild-1.png`, `bild-2.png` …; real file names are kept (made unique).
+pub fn save_asset(root: &Path, name: &str, bytes: &[u8]) -> Result<String, String> {
+    let dir = root.join("assets");
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let (stem, ext) = match name.rsplit_once('.') {
+        Some((s, e)) if !e.is_empty() && e.len() <= 5 => (s, e.to_ascii_lowercase()),
+        _ => (name, "png".to_string()),
+    };
+    let clean: String = stem
+        .chars()
+        .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '-' })
+        .collect::<String>()
+        .split('-')
+        .filter(|p| !p.is_empty())
+        .collect::<Vec<_>>()
+        .join("-");
+    let generic = clean.is_empty() || matches!(clean.to_lowercase().as_str(), "image" | "bild" | "unknown" | "untitled");
+    let mut n = 1;
+    let candidate = loop {
+        let c = if generic {
+            format!("bild-{n}.{ext}")
+        } else if n == 1 {
+            format!("{clean}.{ext}")
+        } else {
+            format!("{clean}-{n}.{ext}")
+        };
+        if !dir.join(&c).exists() {
+            break c;
+        }
+        n += 1;
+    };
+    fs::write(dir.join(&candidate), bytes).map_err(|e| e.to_string())?;
+    Ok(format!("assets/{candidate}"))
+}
+
 #[cfg(test)]
 mod file_ops_tests {
     use super::*;
+
+    #[test]
+    fn pasted_assets_get_free_names() {
+        let root = std::env::temp_dir().join("neotypst-asset-test");
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        assert_eq!(save_asset(&root, "image.png", b"x").unwrap(), "assets/bild-1.png");
+        assert_eq!(save_asset(&root, "image.png", b"x").unwrap(), "assets/bild-2.png");
+        assert_eq!(save_asset(&root, "Bildschirmfoto 2026-11-21 um 10.02.png", b"x").unwrap(), "assets/Bildschirmfoto-2026-11-21-um-10-02.png");
+        assert_eq!(save_asset(&root, "Graph.JPG", b"x").unwrap(), "assets/Graph.jpg");
+        assert_eq!(save_asset(&root, "Graph.jpg", b"x").unwrap(), "assets/Graph-2.jpg");
+        let _ = fs::remove_dir_all(&root);
+    }
 
     #[test]
     fn folders_duplicate_trash_restore() {
