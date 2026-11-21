@@ -233,7 +233,7 @@ Die Update-Pakete sind mit einem eigenen Schlüssel signiert. Die App installier
 
 1. Version in `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` und `package.json` erhöhen
 2. Release-Notizen nach `release-notes/vX.Y.Z.md` schreiben (sie erscheinen auch in der Update-Karte)
-3. `scripts/release.sh` ausführen. Das Skript baut die Universal-App, signiert das Update-Paket mit `~/.tauri/neotypst.key` und lädt DMG, `NeoTypst.app.tar.gz` und `latest.json` als GitHub-Release hoch.
+3. `scripts/release.sh` ausführen. Das Skript baut die App getrennt für Apple Silicon und Intel, signiert die Update-Pakete mit `~/.tauri/neotypst.key` und lädt je ein DMG und ein Update-Paket sowie `latest.json` als GitHub-Release hoch.
 
 Der private Schlüssel `~/.tauri/neotypst.key` gehört nicht ins Repository. Geht er verloren, können bestehende Installationen keine Updates mehr annehmen. Bewahre also eine Sicherungskopie auf, etwa im Passwortmanager.
 
