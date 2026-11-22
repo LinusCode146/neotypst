@@ -1,12 +1,13 @@
-// Arbeitsblatt-Bausteine
+// Arbeitsblatt-Bausteine, aufgebaut auf stil.typ.
 // Lösungen werden über den Schalter „Lösungen“ im Editor ein- und
 // ausgeblendet (sys.inputs.loesungen).
 
-#let loesungen = sys.inputs.at("loesungen", default: "false") == "true"
-#let akzent = rgb("#2b50c8")
-#let grau = luma(120)
+#import "stil.typ" as s
+#import "stil.typ": stil, teil, erg, antwort, betont
 
-#let _aufgabe = counter("aufgabe")
+#let loesungen = sys.inputs.at("loesungen", default: "false") == "true"
+#let grau = luma(110)
+
 #let _punkte = state("punkte", 0)
 
 /// Seitenlayout für ein Arbeitsblatt.
@@ -16,48 +17,39 @@
   klasse: "",
   datum: "",
   namensfeld: true,
+  akzent: black,
   body,
 ) = {
+  show: stil.with(akzent: akzent, rand: (x: 2cm, top: 2.2cm, bottom: 2cm))
   set document(title: titel)
-  set page(
-    paper: "a4",
-    margin: (x: 2cm, top: 2.2cm, bottom: 2cm),
-    footer: context {
-      set text(8pt, fill: grau)
-      h(1fr)
-      [Seite #counter(page).display() von #counter(page).final().first()]
-      h(1fr)
-    },
-  )
-  set text(lang: "de", size: 11pt)
-  set par(justify: true)
+  set page(footer: context {
+    set text(9pt, fill: grau)
+    h(1fr)
+    [Seite #counter(page).display() von #counter(page).final().first()]
+    h(1fr)
+  })
   set enum(numbering: "a)")
-  show heading.where(level: 1): set text(size: 13pt, fill: akzent)
-  show heading: set block(above: 1.6em, below: 0.8em)
 
   grid(
     columns: (1fr, auto),
     align: (left + bottom, right + bottom),
     {
-      set text(9pt, fill: grau)
+      set text(10pt, fill: grau)
       fach
-      if klasse != "" [ · Klasse #klasse]
+      if klasse != "" [#if fach != "" [, ]Klasse #klasse]
       linebreak()
-      text(18pt, weight: "bold", fill: black, titel)
+      text(20pt, weight: "bold", fill: black, titel)
     },
     {
-      if loesungen {
-        box(fill: akzent, inset: (x: 5pt, y: 3pt), radius: 2pt,
-          text(8pt, weight: "bold", fill: white)[LÖSUNG])
-        h(6pt)
-      }
-      text(9pt, fill: grau, datum)
+      set text(10pt, fill: grau)
+      if loesungen [Lösung#h(1em)]
+      datum
     },
   )
-  v(-6pt)
-  line(length: 100%, stroke: 0.8pt + akzent)
+  v(-4pt)
+  line(length: 100%, stroke: 0.5pt + grau)
   if namensfeld {
-    set text(10pt)
+    set text(11pt)
     [Name: #box(width: 6.5cm, repeat[.#h(1pt)])]
     h(1fr)
     context {
@@ -69,42 +61,25 @@
   body
 }
 
-/// Eine Aufgabe. Optional mit Lösung als zweitem Inhaltsblock:
+/// Eine Aufgabe, optional mit Lösung als zweitem Inhaltsblock:
 /// `#aufgabe(punkte: 3)[Aufgabe][Lösung]`
-#let aufgabe(punkte: none, titel: none, body, ..loesung) = {
-  _aufgabe.step()
+/// Die Lösung erscheint nur, wenn „Lösungen“ eingeschaltet ist.
+#let aufgabe(punkte: none, titel: none, nr: auto, body, ..loesung) = {
   if punkte != none { _punkte.update(p => p + punkte) }
-  block(above: 1.5em, below: 0.9em, width: 100%, breakable: true, {
-    text(weight: "bold", fill: akzent)[Aufgabe #context _aufgabe.display()]
-    if titel != none {
-      h(0.5em)
-      text(weight: "bold", titel)
-    }
-    if punkte != none {
-      h(1fr)
-      text(9pt, fill: grau)[#punkte P.]
-    }
-    parbreak()
-    body
-  })
+  s.aufgabe(titel: titel, punkte: punkte, nr: nr, body)
   let l = loesung.pos()
   if loesungen and l.len() > 0 {
     block(
       width: 100%,
-      inset: (x: 10pt, y: 8pt),
-      fill: akzent.lighten(93%),
-      stroke: (left: 2pt + akzent),
-      {
-        text(8pt, weight: "bold", fill: akzent)[LÖSUNG]
-        parbreak()
-        l.first()
-      },
+      inset: (left: 10pt, y: 2pt),
+      stroke: (left: 1pt + luma(170)),
+      l.first(),
     )
   }
 }
 
 /// Inhalt, der nur in der Lösungsversion erscheint.
-#let loesung(body) = if loesungen { text(fill: akzent, body) }
+#let loesung(body) = if loesungen { body }
 
 /// Platz zum Rechnen. art: "karo", "linien" oder "leer".
 /// In der Lösungsversion wird kein Platz gelassen.
@@ -113,10 +88,13 @@
   let farbe = luma(205)
   if art == "karo" {
     let r = 5mm
-    block(width: 100%, height: hoehe, stroke: 0.4pt + farbe, fill: tiling(size: (r, r), {
+    let karo = tiling(size: (r, r), {
       place(line(start: (0pt, 0pt), end: (r, 0pt), stroke: 0.3pt + farbe))
       place(line(start: (0pt, 0pt), end: (0pt, r), stroke: 0.3pt + farbe))
-    }))
+    })
+    // Weißer Grund, damit das Karo auch im grauen Aufgabenkasten wie Papier aussieht.
+    block(width: 100%, height: hoehe, fill: white, stroke: 0.4pt + farbe,
+      block(width: 100%, height: 100%, fill: karo))
   } else if art == "linien" {
     let r = 8mm
     block(width: 100%, height: hoehe, fill: tiling(size: (1cm, r), {
@@ -127,15 +105,16 @@
   }
 }
 
-/// Hinweis- bzw. Merkkasten.
+/// Merkkasten: feiner grauer Rahmen, Titel fett.
 #let merke(titel: "Merke", body) = block(
   width: 100%,
-  inset: 10pt,
-  radius: 3pt,
-  stroke: 0.6pt + akzent,
-  {
-    text(9pt, weight: "bold", fill: akzent, titel)
-    parbreak()
-    body
-  },
-)
+  inset: (x: 11pt, y: 9pt),
+  radius: 2pt,
+  stroke: 0.5pt + luma(160),
+  above: 1.4em,
+  below: 1.2em,
+)[
+  #text(weight: "bold", titel)
+  #v(0.4em, weak: true)
+  #body
+]

@@ -17,7 +17,8 @@
   Berechne die Beschleunigung $a$.
   #platz(3cm)
 ][
-  $a = (Delta v)/(Delta t) = (27.8 "m/s")/(8 "s") approx 3.5 "m/s"^2$
+  $ a &= (Delta v)/(Delta t) = (27,8 "m/s")/(8 "s") \
+      &approx erg(3,5 "m/s"^2) $
 ]
 
 #aufgabe(punkte: 4, titel: "Bremsweg")[
@@ -27,10 +28,11 @@
   #table(
     columns: 4,
     align: center,
+    fill: white,
     table.header[$t$ in s][$0$][$4$][$8$],
     [$s$ in m], [$0$], [], [],
   )
 ][
-  + $s = 1/2 a t^2 = 1/2 dot 3.5 "m/s"^2 dot (8 "s")^2 approx 111 "m"$
-  + $s(4 "s") approx 28 "m"$, $s(8 "s") approx 111 "m"$
+  #teil[$ s = 1/2 a t^2 = 1/2 dot 3,5 "m/s"^2 dot (8 "s")^2 approx erg(111 "m") $]
+  #teil[$s(4 "s") approx 28 "m"$ und $s(8 "s") approx 111 "m"$]
 ]

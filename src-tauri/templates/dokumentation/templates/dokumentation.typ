@@ -1,6 +1,7 @@
-// Technische Dokumentation (z. B. für Informatik-Projekte).
+// Technische Dokumentation (z. B. für Informatik-Projekte), aufgebaut auf stil.typ.
 
-#let akzent = rgb("#2b50c8")
+#import "stil.typ": *
+
 #let grau = luma(110)
 
 #let dokumentation(
@@ -9,64 +10,53 @@
   autoren: (),
   datum: "",
   inhaltsverzeichnis: true,
+  akzent: black,
   body,
 ) = {
+  show: stil.with(akzent: akzent, rand: (x: 2.5cm, y: 2.5cm))
   set document(title: titel, author: autoren)
-  set text(lang: "de", size: 11pt)
-  set par(justify: true, leading: 0.7em)
   set heading(numbering: "1.1")
 
   // Deckblatt
-  page(margin: 3cm, {
+  page(margin: 3cm, header: none, footer: none, {
     v(25%)
-    text(26pt, weight: "bold", titel)
+    text(28pt, weight: "bold", titel)
     if untertitel != "" {
       v(0.4em)
-      text(14pt, fill: grau, untertitel)
+      text(15pt, fill: grau, untertitel)
     }
-    v(1.5em)
-    line(length: 4cm, stroke: 2pt + akzent)
+    v(1.2em)
+    line(length: 4cm, stroke: 0.8pt + black)
     v(1fr)
-    text(11pt, autoren.join(", "))
+    text(12pt, autoren.join(", "))
     linebreak()
-    text(10pt, fill: grau, datum)
+    text(11pt, fill: grau, datum)
   })
 
   set page(
-    paper: "a4",
-    margin: (x: 2.5cm, y: 2.5cm),
     header: context {
-      set text(8pt, fill: grau)
+      set text(9pt, fill: grau)
       titel
       h(1fr)
-      let h = query(selector(heading.where(level: 1)).before(here()))
-      if h.len() > 0 { h.last().body }
+      // Kapitel, das auf dieser Seite beginnt, sonst das zuletzt begonnene.
+      let seite = here().page()
+      let hier = query(heading.where(level: 1)).filter(h => h.location().page() == seite)
+      let davor = query(selector(heading.where(level: 1)).before(here()))
+      if hier.len() > 0 { hier.first().body } else if davor.len() > 0 { davor.last().body }
     },
-    footer: context { set text(8pt, fill: grau); h(1fr); counter(page).display() },
+    footer: context { set text(9pt, fill: grau); h(1fr); counter(page).display() },
   )
   counter(page).update(1)
 
   show heading.where(level: 1): it => {
     pagebreak(weak: true)
-    v(1em)
-    set text(18pt)
+    v(0.6em)
     it
-    v(0.4em)
+    v(0.2em)
   }
 
-  // Code
-  show raw.where(block: true): it => block(
-    width: 100%,
-    inset: 10pt,
-    radius: 4pt,
-    fill: luma(246),
-    stroke: 0.5pt + luma(220),
-    text(9.5pt, it),
-  )
   show raw.where(block: false): box.with(fill: luma(242), inset: (x: 3pt, y: 0pt), outset: (y: 3pt), radius: 2pt)
-
-  show figure.caption: set text(9pt)
-  show link: set text(fill: akzent)
+  show link: underline
 
   if inhaltsverzeichnis {
     outline(title: "Inhaltsverzeichnis", depth: 2)
@@ -74,12 +64,16 @@
   body
 }
 
-/// Kasten für Hinweise, Warnungen etc.
-#let hinweis(titel: "Hinweis", farbe: akzent, body) = block(
+/// Kasten für Hinweise, Warnungen etc.: grau hinterlegt, Titel fett.
+#let hinweis(titel: "Hinweis", body) = context block(
   width: 100%,
-  inset: 10pt,
-  radius: 3pt,
-  fill: farbe.lighten(92%),
-  stroke: (left: 2.5pt + farbe),
-  [#text(weight: "bold", fill: farbe, titel) \ #body],
-)
+  inset: (x: 11pt, y: 9pt),
+  radius: 2pt,
+  fill: _kasten.get(),
+  above: 1.2em,
+  below: 1.2em,
+)[
+  #text(weight: "bold", titel)
+  #v(0.4em, weak: true)
+  #body
+]

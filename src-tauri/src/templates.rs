@@ -66,6 +66,11 @@ macro_rules! tpl_file {
     };
 }
 
+/// Gemeinsame Stil-Bibliothek: Jede eingebaute Vorlage legt sie als
+/// `templates/stil.typ` ins Projekt, damit das Projekt ohne Paket kompiliert.
+/// Dieselbe Datei gibt es als `@local/stil` (siehe templates/_stil/README.md).
+const STIL: (&str, &str) = ("templates/stil.typ", include_str!("../templates/_stil/stil.typ"));
+
 struct Builtin {
     id: &'static str,
     name: &'static str,
@@ -80,35 +85,35 @@ static BUILTIN: &[Builtin] = &[
         name: "Arbeitsblatt",
         description: "Aufgaben mit Punkten, Rechenplatz und ein-/ausblendbaren Lösungen.",
         category: "Mathe & Physik",
-        files: &[tpl_file!("arbeitsblatt", "main.typ"), tpl_file!("arbeitsblatt", "templates/arbeitsblatt.typ")],
+        files: &[tpl_file!("arbeitsblatt", "main.typ"), tpl_file!("arbeitsblatt", "templates/arbeitsblatt.typ"), STIL],
     },
     Builtin {
         id: "hausaufgabe",
         name: "Hausaufgabe",
         description: "Abgabe mit Aufgabenstellung, Lösungsweg und markierten Ergebnissen.",
         category: "Mathe & Physik",
-        files: &[tpl_file!("hausaufgabe", "main.typ"), tpl_file!("hausaufgabe", "templates/hausaufgabe.typ")],
+        files: &[tpl_file!("hausaufgabe", "main.typ"), tpl_file!("hausaufgabe", "templates/hausaufgabe.typ"), STIL],
     },
     Builtin {
         id: "wettbewerb",
         name: "Wettbewerb",
         description: "Olympiade-Format: jede Aufgabe auf eigener Seite, Behauptung und Beweis.",
         category: "Mathe & Physik",
-        files: &[tpl_file!("wettbewerb", "main.typ"), tpl_file!("wettbewerb", "templates/wettbewerb.typ")],
+        files: &[tpl_file!("wettbewerb", "main.typ"), tpl_file!("wettbewerb", "templates/wettbewerb.typ"), STIL],
     },
     Builtin {
         id: "dokumentation",
         name: "Dokumentation",
         description: "Deckblatt, Inhaltsverzeichnis, Codeblöcke und Hinweiskästen.",
         category: "Informatik",
-        files: &[tpl_file!("dokumentation", "main.typ"), tpl_file!("dokumentation", "templates/dokumentation.typ")],
+        files: &[tpl_file!("dokumentation", "main.typ"), tpl_file!("dokumentation", "templates/dokumentation.typ"), STIL],
     },
     Builtin {
         id: "leer",
         name: "Leeres Dokument",
-        description: "Nur die Grundeinstellungen: A4, Deutsch, Blocksatz.",
+        description: "Nur der Grundstil: A4, Deutsch, Charter 12 pt, Aufgaben und Teilaufgaben.",
         category: "Allgemein",
-        files: &[tpl_file!("leer", "main.typ")],
+        files: &[tpl_file!("leer", "main.typ"), STIL],
     },
 ];
 
