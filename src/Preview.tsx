@@ -5,6 +5,8 @@ export type Marker = { page: number; x: number; y: number; key: number };
 
 export type PreviewHandle = {
   scrollTo(page: number, y: number, onlyIfHidden: boolean): void;
+  /** Holt die Seite in die Mitte; ist sie höher als die Vorschau, die Stelle y. */
+  center(page: number, y: number): void;
 };
 
 type Props = {
@@ -85,6 +87,21 @@ export const Preview = forwardRef<PreviewHandle, Props>(function Preview({ pages
       const visible = target > top + 40 && target < top + el.clientHeight - 40;
       if (onlyIfHidden && visible) return;
       el.scrollTo({ top: target - el.clientHeight / 3, behavior: "smooth" });
+    },
+    center(page, y) {
+      const el = scroller.current;
+      const pageEl = el?.querySelector<HTMLElement>(`.page[data-page="${page}"]`);
+      if (!el || !pageEl) return;
+      const top = pageTop(pageEl);
+      const h = pageEl.offsetHeight;
+      const view = el.clientHeight;
+      // Passt die Seite ganz hinein: Seite mittig. Sonst die Arbeitsstelle
+      // mittig, aber nicht über den Seitenrand hinaus.
+      const target =
+        h <= view ? top + h / 2 - view / 2 : Math.min(Math.max(top + y * scale - view / 2, top - 16), top + h - view + 16);
+      // Kleine Abweichungen nicht korrigieren, sonst ruckelt es beim Tippen.
+      if (Math.abs(target - el.scrollTop) < view * 0.12) return;
+      el.scrollTo({ top: target, behavior: "smooth" });
     },
   }));
 

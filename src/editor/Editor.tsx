@@ -21,6 +21,7 @@ import {
   closeBrackets,
   closeBracketsKeymap,
   completionKeymap,
+  moveCompletionSelection,
   snippet,
   startCompletion,
 } from "@codemirror/autocomplete";
@@ -281,6 +282,15 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(props, ref
     }),
     Prec.high(
       keymap.of([
+        // Vorschlagsliste vor der normalen Cursorsteuerung, sonst bewegen ↑/↓
+        // den Cursor und schließen die Liste, statt einen Vorschlag zu wählen.
+        ...completionKeymap,
+        // Ohne die Hand von der Grundreihe zu nehmen: Ctrl-J/K wie in Vim,
+        // Ctrl-N/P wie in Emacs. Greifen nur, solange die Liste offen ist.
+        { key: "Ctrl-j", run: moveCompletionSelection(true) },
+        { key: "Ctrl-k", run: moveCompletionSelection(false) },
+        { key: "Ctrl-n", run: moveCompletionSelection(true) },
+        { key: "Ctrl-p", run: moveCompletionSelection(false) },
         { key: "Tab", run: (v) => acceptCompletion(v) || expandAbbreviation(v) || indentMore(v), shift: indentLess },
         { key: "Mod-s", run: () => (propsRef.current.onSave(), true) },
         { key: "Mod-b", run: (v) => wrapSelection(v, "*") },
@@ -299,7 +309,7 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(props, ref
         { key: "Backspace", run: mathSpaceBackspace },
       ]),
     ),
-    keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...searchKeymap, ...historyKeymap, ...completionKeymap, ...lintKeymap]),
+    keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...searchKeymap, ...historyKeymap, ...lintKeymap]),
     EditorView.updateListener.of((u) => {
       const file = rel.current;
       if (!file) return;

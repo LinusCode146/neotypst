@@ -8,8 +8,11 @@
 
 // ─── Einstellungen ─────────────────────────────────────────────────────────
 
-#let _akzent = state("stil-akzent", black)
-#let _kasten = state("stil-kasten", luma(244))
+// Akzent- und Kastenfarbe als Stapel: Jedes `#show: stil.with(…)` legt seine
+// Werte oben drauf und nimmt sie am Ende seines Bereichs wieder herunter.
+// So färbt ein Kapitel mit eigener Akzentfarbe nichts, was danach kommt.
+#let _akzent = state("stil-akzent", (black,))
+#let _kasten = state("stil-kasten", (luma(244),))
 #let _aufgabe = counter("stil-aufgabe")
 #let _teil = counter("stil-teil")
 
@@ -26,10 +29,21 @@
 
 #let _komma = math.class("normal", ",")
 #let _seq = [].func()
-#let _ist-text(c, muster) = (
-  // Ziffern sind `text`, das Komma ist je nach Typst-Version `text` oder `symbol`.
-  type(c) == content and c.has("text") and type(c.text) == str and c.text.match(muster) != none
-)
+#let _leer = [ ].func()
+#let _symbol = $x$.body.func()
+#let _ziffern = "0123456789"
+
+// Ziffern sind `text`, das Komma ist je nach Typst-Version `text` oder `symbol`.
+#let _text-von(c) = if type(c) == content and c.has("text") and type(c.text) == str { c.text } else { none }
+#let _ist-komma(c) = _text-von(c) == ","
+#let _endet-ziffer(c) = {
+  let t = _text-von(c)
+  t != none and t != "" and _ziffern.contains(t.last())
+}
+#let _beginnt-ziffer(c) = {
+  let t = _text-von(c)
+  t != none and t != "" and _ziffern.contains(t.first())
+}
 
 // ─── Einheiten ─────────────────────────────────────────────────────────────
 // Direkt nach einer Zahl werden Einheiten erkannt und aufrecht mit schmalem
@@ -42,8 +56,8 @@
   "N", "V", "A", "W", "J", "K", "C", "F", "T", "H", "S", "Ω", "°", "%",
 )
 
-#let _ist-symbol(c) = type(c) == content and repr(c.func()) == "symbol"
-#let _leer = [ ].func()
+#let _ist-symbol(c) = type(c) == content and c.func() == _symbol
+#let _einheit-anfang = regex("^[\\pL°µ]")
 
 /// Ist c eine Einheit? Mit folge: true auch mehrere Einheiten hintereinander
 /// wie `kg m` (für Zähler und Nenner von km/h, kg m/s^2 …).
@@ -51,7 +65,7 @@
   if type(c) != content { return false }
   let f = c.func()
   // Text in Anführungszeichen und die vordefinierten Namen (km, kg, …)
-  if f == text { return c.text.match(regex("^[\pL°µ]")) != none }
+  if f == text { return c.text.match(_einheit-anfang) != none }
   if _ist-symbol(c) { return c.text in _einheit-zeichen }
   if f == math.attach { return _ist-einheit(c.base) }
   if f == math.frac { return _ist-einheit(c.num, folge: true) and _ist-einheit(c.denom, folge: true) }
@@ -138,68 +152,108 @@
   if kern.func() == text and _ist-einheit(c) { i } else { none }
 }
 
-#let _dezimal(body) = {
-  if type(body) != content { return body }
+/// Bearbeitet einen Formelteil. Gibt `none` zurück, wenn sich nichts ändert:
+/// So muss nichts mit dem Original verglichen werden, und unveränderte Teile
+/// werden nicht neu gebaut.
+#let _neu(body) = {
+  if type(body) != content { return none }
   let f = body.func()
   if f == _seq {
     let ch = body.children
-    let neu = ()
-    let geaendert = false
+    let neu = none
     let i = 0
     while i < ch.len() {
       let c = ch.at(i)
-      let davor = if i > 0 { ch.at(i - 1) } else { none }
-      let danach = if i + 1 < ch.len() { ch.at(i + 1) } else { none }
-      if _ist-text(c, regex("^,$")) and _ist-text(davor, regex("\d$")) and _ist-text(danach, regex("^\d")) {
+      let ersatz = none
+      let weiter = i + 1
+      if _ist-komma(c) and i > 0 and _endet-ziffer(ch.at(i - 1)) and i + 1 < ch.len() and _beginnt-ziffer(ch.at(i + 1)) {
         // 0,4871: Komma ohne Abstand
-        neu.push(_komma)
-        geaendert = true
-      } else if _ist-text(c, regex("\\d$")) and _einheit-nach(ch, i + 1) != none {
-        // 100 km/h: schmaler Abstand, Einheiten aufrecht, auch mehrere
-        // hintereinander wie N m oder °C
-        neu.push(c)
+        ersatz = (_komma,)
+      } else if _endet-ziffer(c) {
         let j = _einheit-nach(ch, i + 1)
-        neu.push(math.thin)
-        neu.push(_einheit-satz(ch.at(j)))
-        i = j
-        while true {
-          if i + 1 < ch.len() and _ist-einheit(ch.at(i + 1)) {
-            neu.push(_einheit-satz(ch.at(i + 1)))
-            i += 1
-          } else if i + 2 < ch.len() and ch.at(i + 1).func() == _leer and _ist-einheit(ch.at(i + 2)) {
-            neu.push(math.thin)
-            neu.push(_einheit-satz(ch.at(i + 2)))
-            i += 2
-          } else { break }
+        if j != none {
+          // 100 km/h: schmaler Abstand, Einheiten aufrecht, auch mehrere
+          // hintereinander wie N m oder °C
+          ersatz = (c, math.thin, _einheit-satz(ch.at(j)))
+          let k = j
+          while true {
+            if k + 1 < ch.len() and _ist-einheit(ch.at(k + 1)) {
+              ersatz += (_einheit-satz(ch.at(k + 1)),)
+              k += 1
+            } else if k + 2 < ch.len() and ch.at(k + 1).func() == _leer and _ist-einheit(ch.at(k + 2)) {
+              ersatz += (math.thin, _einheit-satz(ch.at(k + 2)))
+              k += 2
+            } else { break }
+          }
+          weiter = k + 1
         }
-        geaendert = true
       } else {
-        let d = _dezimal(c)
-        if d != c { geaendert = true }
-        neu.push(d)
+        let n = _neu(c)
+        if n != none { ersatz = (n,) }
       }
-      i += 1
+      if ersatz != none and neu == none { neu = ch.slice(0, i) }
+      if neu != none { if ersatz == none { neu.push(c) } else { neu += ersatz } }
+      i = weiter
     }
-    return if geaendert { neu.join() } else { body }
+    return if neu == none { none } else { neu.join() }
   }
   // In verschachtelte Formelteile hineinschauen.
   if f == math.frac {
-    return math.frac(_dezimal(body.num), _dezimal(body.denom))
+    let (n, d) = (_neu(body.num), _neu(body.denom))
+    if n == none and d == none { return none }
+    return math.frac(if n == none { body.num } else { n }, if d == none { body.denom } else { d })
   }
   if f == math.attach {
     let felder = body.fields()
+    let anders = false
+    for (k, v) in felder {
+      let w = _neu(v)
+      if w != none { felder.insert(k, w); anders = true }
+    }
+    if not anders { return none }
     let base = felder.remove("base")
-    for (k, v) in felder { felder.insert(k, _dezimal(v)) }
-    return math.attach(_dezimal(base), ..felder)
+    return math.attach(base, ..felder)
   }
-  if f == math.lr { return math.lr(_dezimal(body.body)) }
-  if f == math.underline { return math.underline(_dezimal(body.body)) }
-  if f == math.overline { return math.overline(_dezimal(body.body)) }
+  if f in (math.lr, math.underline, math.overline) {
+    let b = _neu(body.body)
+    return if b == none { none } else { f(b) }
+  }
   if f == math.root {
     let index = body.at("index", default: none)
-    return math.root(if index == none { none } else { _dezimal(index) }, _dezimal(body.radicand))
+    let i = _neu(index)
+    let r = _neu(body.radicand)
+    if i == none and r == none { return none }
+    return math.root(if i == none { index } else { i }, if r == none { body.radicand } else { r })
   }
-  body
+  none
+}
+
+/// Wie `_neu`, gibt aber bei unveränderten Teilen das Original zurück.
+#let _dezimal(body) = {
+  let n = _neu(body)
+  if n == none { body } else { n }
+}
+
+// Markiert bearbeitete Formeln, damit die Formel-Regel sie kein zweites Mal
+// durchläuft. Unsichtbar und ohne Platzbedarf.
+#let _fertig = metadata("stil-fertig")
+
+/// Die Formel-Regel aus `stil`: Dezimalkomma und Einheiten.
+#let _formel(it) = {
+  let b = it.body
+  if b.func() == _seq and b.children.len() > 0 and b.children.first() == _fertig { return it }
+  let neu = _neu(b)
+  if neu == none { return it }
+  // Die neu gebaute Formel zählt selbst mit; die ursprüngliche hat die Nummer
+  // schon vergeben. Sonst wären nummerierte Formeln (2), (4), …
+  if it.block and it.numbering != none { counter(math.equation).update(n => n - 1) }
+  math.equation(
+    [#_fertig#neu],
+    block: it.block,
+    numbering: it.numbering,
+    number-align: it.number-align,
+    supplement: it.supplement,
+  )
 }
 
 // ─── Rechnungen ────────────────────────────────────────────────────────────
@@ -223,11 +277,11 @@
   if nr == auto { _aufgabe.step() }
   _teil.update(0)
   context {
-    let ak = _akzent.get()
+    let ak = _akzent.get().last()
     let nummer = if nr == auto { _aufgabe.display() } else { nr }
     block(
       width: 100%,
-      fill: _kasten.get(),
+      fill: _kasten.get().last(),
       inset: (x: 11pt, y: 9pt),
       radius: 2pt,
       above: 1.6em,
@@ -267,7 +321,7 @@
       and teile.first().block and not repr(teile.first().body).contains("linebreak")
   )
   context {
-    let ak = _akzent.get()
+    let ak = _akzent.get().last()
     let b = if eigen == none { numbering("a", _teil.get().first()) } else { eigen }
     show math.equation.where(block: true): set block(above: 0.4em, below: 0.4em)
     block(above: 1em, below: 1em, grid(
@@ -286,7 +340,7 @@
 
 /// Akzentfarbe an einer Stelle im Dokument nutzen: `#text(fill: akzent())[…]`
 /// geht nur in `context`; für Text reicht `#betont[…]`.
-#let betont(body) = context text(fill: _akzent.get(), body)
+#let betont(body) = context text(fill: _akzent.get().last(), body)
 
 // ─── Grundeinstellungen ────────────────────────────────────────────────────
 
@@ -294,20 +348,20 @@
 ///
 /// - akzent: Farbe für Aufgabenköpfe und Teilaufgaben
 /// - kasten: Hintergrund der Aufgabenstellung
-/// - schrift: Textschrift, z. B. "Charter" oder "Libron"
+/// - schrift: Textschrift, Standard ist die LaTeX-Schrift; z. B. "Charter" oder "Libron"
 /// - groesse: Grundgröße des Textes
 /// - formeln: Schrift für Formeln
 #let stil(
   akzent: black,
   kasten: luma(244),
-  schrift: "Charter",
+  schrift: "New Computer Modern",
   groesse: 12pt,
   formeln: "New Computer Modern Math",
   rand: (x: 2.2cm, y: 2cm),
   body,
 ) = {
-  _akzent.update(akzent)
-  _kasten.update(kasten)
+  _akzent.update(s => s + (akzent,))
+  _kasten.update(s => s + (kasten,))
   let faktor = _skalierung.at(schrift, default: 1)
 
   set page(paper: "a4", margin: rand)
@@ -321,19 +375,19 @@
 
   // Formeln: Computer Modern, Größe passend zur Textschrift.
   show math.equation: set text(font: formeln, size: groesse)
-  show math.equation: it => {
-    let neu = _dezimal(it.body)
-    if neu == it.body { it } else { math.equation(neu, block: it.block, numbering: it.numbering) }
-  }
+  show math.equation: _formel
   set math.equation(numbering: none)
   show math.equation.where(block: true): set block(above: 1em, below: 1em)
 
   // Überschriften schlicht, ohne Nummern.
   set heading(numbering: none)
-  show heading: set text(weight: "bold")
-  show heading.where(level: 1): set text(size: 1.45em)
-  show heading.where(level: 2): set text(size: 1.2em)
-  show heading.where(level: 3): set text(size: 1.05em)
+  // Die fette Computer Modern ist breit gebaut: Überschriften deshalb nur
+  // wenig größer als der Text und mit etwas engeren Buchstaben.
+  // Feste Größen (bei 12 pt: 15 / 13 / 12 pt), damit sich nichts aufaddiert.
+  show heading: set text(weight: "bold", tracking: -0.015em)
+  show heading.where(level: 1): set text(size: groesse * faktor * 1.25)
+  show heading.where(level: 2): set text(size: groesse * faktor * 1.085)
+  show heading.where(level: 3): set text(size: groesse * faktor)
   show heading: set block(above: 1.6em, below: 0.8em)
 
   // Code
@@ -352,4 +406,6 @@
   set enum(indent: 0.4em, body-indent: 0.6em)
 
   body
+  _akzent.update(s => s.slice(0, -1))
+  _kasten.update(s => s.slice(0, -1))
 }

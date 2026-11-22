@@ -329,15 +329,17 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
     setCursor({ line, col });
     cursorOffset.current = offset;
     window.clearTimeout(cursorTimer.current);
-    // Don't chase the cursor while typing; only for deliberate moves.
-    if (Date.now() - lastEdit.current < 120) return;
+    // Die Vorschau folgt immer der Seite, auf der gerade gearbeitet wird. Beim
+    // Tippen erst nach einer kurzen Pause (dann ist neu kompiliert) und ohne
+    // Markierung, bei bewussten Cursorbewegungen sofort mit Markierung.
+    const typing = Date.now() - lastEdit.current < 120;
     cursorTimer.current = window.setTimeout(async () => {
       const positions = await api.jumpFromCursor(rel, offset).catch(() => []);
       const p = positions[0];
       if (!p) return;
-      setMarker({ ...p, key: Date.now() });
-      preview.current?.scrollTo(p.page, p.y, true);
-    }, 180);
+      if (!typing) setMarker({ ...p, key: Date.now() });
+      preview.current?.center(p.page, p.y);
+    }, typing ? 450 : 180);
   }, []);
 
   const revealInPreview = useCallback(async () => {

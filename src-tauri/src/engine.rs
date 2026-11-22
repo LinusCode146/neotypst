@@ -98,7 +98,7 @@ pub struct CompileOut {
     millis: u128,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 #[serde(tag = "kind", rename_all = "lowercase")]
 pub enum JumpOut {
     File { file: String, offset: usize },
@@ -251,8 +251,29 @@ impl Engine {
         let s = self.session()?;
         let Some(doc) = &s.document else { return Ok(None) };
         let Some(page) = NonZeroUsize::new(page + 1) else { return Ok(None) };
-        let pos = PagedPosition { page, point: Point::new(Abs::pt(x), Abs::pt(y)) };
-        let jump = typst_ide::jump_from_click(&s.world, doc, &pos);
+        let at = |x: f64, y: f64| PagedPosition { page, point: Point::new(Abs::pt(x), Abs::pt(y)) };
+        let in_template = |j: &typst_ide::Jump| match j {
+            typst_ide::Jump::File(id, _) => s.world.rel_path(*id).is_some_and(|f| f.starts_with("templates/")),
+            _ => false,
+        };
+        let mut jump = typst_ide::jump_from_click(&s.world, doc, &at(x, y));
+        // Text, den eine Vorlage erzeugt (z. B. „Aufgabe 1“ aus stil.typ), führt
+        // in die Vorlage. Gesucht ist aber die Stelle im eigenen Dokument: den
+        // nächstgelegenen Text suchen, der aus einer eigenen Datei stammt.
+        if jump.as_ref().is_some_and(&in_template) {
+            'suche: for r in [6.0, 12.0, 18.0, 26.0, 36.0, 50.0, 70.0, 95.0, 130.0, 180.0] {
+                for k in 0..24 {
+                    let a = k as f64 * std::f64::consts::TAU / 24.0;
+                    let near = typst_ide::jump_from_click(&s.world, doc, &at(x + r * a.cos(), y + r * a.sin()));
+                    if let Some(j @ typst_ide::Jump::File(..)) = near
+                        && !in_template(&j)
+                    {
+                        jump = Some(j);
+                        break 'suche;
+                    }
+                }
+            }
+        }
         Ok(jump.and_then(|j| match j {
             typst_ide::Jump::File(id, byte) => {
                 let file = s.world.rel_path(id)?;
@@ -564,6 +585,45 @@ mod tests {
         assert_eq!(check("kin"), Some(false));
         assert_eq!(check(" x"), None);
         assert_eq!(check("#import"), None);
+    }
+
+    /// Ein Klick auf Text, den eine Vorlage erzeugt, springt nicht in die
+    /// Vorlage, sondern zur nächsten Stelle im eigenen Dokument.
+    #[test]
+    fn click_on_template_text_lands_in_document() {
+        let dir = std::env::temp_dir().join("neotypst-template-jump-test");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("templates")).unwrap();
+        std::fs::write(dir.join("templates/vorlage.typ"), "#let kasten(body) = [*Aufgabe Kopfzeile* \\ #body]").unwrap();
+        let text = "#import \"templates/vorlage.typ\": *\n#kasten[Hier steht die Aufgabenstellung.]";
+        std::fs::write(dir.join("main.typ"), text).unwrap();
+        let mut e = Engine::new();
+        e.open(dir, "main.typ".into()).unwrap();
+        e.compile(None, None).unwrap();
+        let off = text[..text.find("Hier").unwrap()].encode_utf16().count();
+        let p = e.jump_from_cursor("main.typ".into(), off).unwrap().remove(0);
+        // Eine Zeile höher steht die Kopfzeile aus der Vorlage: Typst selbst
+        // würde dorthin springen …
+        let (kx, ky) = (p.x + 3.0, p.y - 18.0);
+        {
+            let s = e.session().unwrap();
+            let pos = PagedPosition {
+                page: NonZeroUsize::new(p.page + 1).unwrap(),
+                point: Point::new(Abs::pt(kx), Abs::pt(ky)),
+            };
+            let roh = typst_ide::jump_from_click(&s.world, s.document.as_ref().unwrap(), &pos);
+            let ziel = match roh {
+                Some(typst_ide::Jump::File(id, _)) => s.world.rel_path(id),
+                _ => None,
+            };
+            assert_eq!(ziel.as_deref(), Some("templates/vorlage.typ"));
+        }
+        // … NeoTypst landet im eigenen Dokument.
+        let j = e.jump_from_click(p.page, kx, ky).unwrap();
+        match j {
+            Some(JumpOut::File { file, .. }) => assert_eq!(file, "main.typ"),
+            other => panic!("Sprung nicht ins Dokument: {other:?}"),
+        }
     }
 
     #[test]

@@ -29,7 +29,7 @@
   v(0.2em)
   context block(
     width: 100%,
-    fill: _kasten.get(),
+    fill: _kasten.get().last(),
     inset: (x: 11pt, y: 9pt),
     radius: 2pt,
     below: 1em,

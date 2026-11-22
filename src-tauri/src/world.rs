@@ -26,9 +26,61 @@ pub static FONTS: LazyLock<FontStore> = LazyLock::new(|| {
     store
 });
 
+/// Common `@preview` packages (CeTZ, Fletcher, Lilaq, Physica, Zero, …) ship
+/// inside the app, so they work offline from the first use. See
+/// `packages/README.md` for the list and how to add more.
+static BUNDLED: include_dir::Dir<'static> = include_dir::include_dir!("$CARGO_MANIFEST_DIR/packages");
+
+/// Copies the bundled packages into the Typst package cache (`<cache>/preview/
+/// <name>/<version>`). Versions already there are left alone. Each version is
+/// written to a temporary folder first and renamed, so a crash never leaves a
+/// half-written package behind.
+pub fn install_bundled_packages(cache: &std::path::Path) -> std::io::Result<usize> {
+    fn write_all(dir: &include_dir::Dir, strip: &std::path::Path, target: &std::path::Path) -> std::io::Result<()> {
+        for file in dir.files() {
+            let rel = file.path().strip_prefix(strip).unwrap_or(file.path());
+            let out = target.join(rel);
+            if let Some(parent) = out.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            std::fs::write(out, file.contents())?;
+        }
+        for sub in dir.dirs() {
+            write_all(sub, strip, target)?;
+        }
+        Ok(())
+    }
+
+    let mut installed = 0;
+    for namespace in BUNDLED.dirs() {
+        for name in namespace.dirs() {
+            for version in name.dirs() {
+                let target = cache.join(version.path());
+                if target.exists() {
+                    continue;
+                }
+                let Some(parent) = target.parent() else { continue };
+                let label = version.path().file_name().and_then(|n| n.to_str()).unwrap_or("paket");
+                let tmp = parent.join(format!(".{label}.neotypst-tmp"));
+                let _ = std::fs::remove_dir_all(&tmp);
+                write_all(version, version.path(), &tmp)?;
+                std::fs::rename(&tmp, &target)?;
+                installed += 1;
+            }
+        }
+    }
+    Ok(installed)
+}
+
 /// Packages from `@preview` are downloaded on first use and cached in the
-/// standard Typst cache directory (shared with the Typst CLI).
+/// standard Typst cache directory (shared with the Typst CLI). Bundled
+/// packages are put there first, so they never need the network.
 static PACKAGES: LazyLock<SystemPackages> = LazyLock::new(|| {
+    if let Some(cache) = FsPackages::system_cache()
+        && let Err(e) = install_bundled_packages(cache.path())
+    {
+        eprintln!("Mitgelieferte Pakete konnten nicht bereitgestellt werden: {e}");
+    }
     let agent = format!("neotypst/{}", env!("CARGO_PKG_VERSION"));
     SystemPackages::from_parts(
         FsPackages::system_data(),
@@ -188,5 +240,28 @@ impl typst_ide::IdeWorld for EditorWorld {
             }
         }
         out
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    /// The bundled packages land in an empty cache once, with their files
+    /// complete, and a second run leaves them alone.
+    #[test]
+    fn bundled_packages_install_once() {
+        let cache = std::env::temp_dir().join("neotypst-paket-cache-test");
+        let _ = std::fs::remove_dir_all(&cache);
+        let first = super::install_bundled_packages(&cache).unwrap();
+        assert!(first >= 10, "nur {first} Pakete bereitgestellt");
+        for pkg in ["cetz/0.5.3", "fletcher/0.6.0", "lilaq/0.6.0", "physica/0.9.5", "zero/0.6.1"] {
+            let dir = cache.join("preview").join(pkg);
+            assert!(dir.join("typst.toml").is_file(), "{pkg} fehlt");
+        }
+        assert!(cache.join("preview/cetz/0.5.3/cetz-core/cetz_core.wasm").is_file());
+        assert_eq!(super::install_bundled_packages(&cache).unwrap(), 0);
+        let leftovers = std::fs::read_dir(cache.join("preview/cetz")).unwrap()
+            .filter(|e| e.as_ref().unwrap().file_name().to_string_lossy().contains("neotypst-tmp"))
+            .count();
+        assert_eq!(leftovers, 0);
     }
 }

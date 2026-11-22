@@ -69,7 +69,7 @@
   width: 100%,
   inset: (x: 11pt, y: 9pt),
   radius: 2pt,
-  fill: _kasten.get(),
+  fill: _kasten.get().last(),
   above: 1.2em,
   below: 1.2em,
 )[

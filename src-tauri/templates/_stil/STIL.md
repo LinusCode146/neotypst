@@ -13,10 +13,10 @@ Die eingebauten NeoTypst-Vorlagen (Arbeitsblatt, Hausaufgabe, Wettbewerb, Dokume
 ## 1 Grundlayout
 
 - A4, Rand 2,2 cm links und rechts, 2 cm oben und unten
-- Textschrift **Charter** 12 pt, Flattersatz, Zeilenabstand 0,8 em
+- Textschrift **New Computer Modern** 12 pt (die LaTeX-Schrift, passend zu den Formeln), Flattersatz, Zeilenabstand 0,8 em
 - Formeln in **New Computer Modern Math**, gleiche Größe wie der Text
 - Deutsch eingestellt: Silbentrennung, „Anführungszeichen“, Abbildung/Tabelle
-- Überschriften fett, ohne Nummern: `=` Titel des Dokuments, `==` Abschnitt, `===` Unterabschnitt
+- Überschriften fett, nur wenig größer als der Text (15 / 13 / 12 pt) und leicht enger gesetzt, ohne Nummern: `=` Titel des Dokuments, `==` Abschnitt, `===` Unterabschnitt
 - Keine Trennlinien (`#line()`) zwischen Aufgaben. Der Aufgabenkasten trennt die Aufgaben bereits.
 - Keine Zierzeichen als Trenner, also keine Mittelpunkte (·), Gedankenstriche oder Pfeile zwischen Titel und Text. Titel und Text werden durch Abstand oder einen Zeilenumbruch getrennt.
 
@@ -26,7 +26,7 @@ Die eingebauten NeoTypst-Vorlagen (Arbeitsblatt, Hausaufgabe, Wettbewerb, Dokume
 |---|---|---|
 | `akzent` | `black` | `akzent: rgb("#2b50c8")` |
 | `kasten` | `luma(244)` (Hellgrau) | `kasten: rgb("#f3f1ec")` |
-| `schrift` | `"Charter"` | `schrift: "Libron"` |
+| `schrift` | `"New Computer Modern"` | `schrift: "Charter"`, `schrift: "Libron"` |
 | `groesse` | `12pt` | `groesse: 11pt` |
 | `formeln` | `"New Computer Modern Math"` | |
 | `rand` | `(x: 2.2cm, y: 2cm)` | `rand: 2.5cm` |
@@ -35,7 +35,7 @@ Die eingebauten NeoTypst-Vorlagen (Arbeitsblatt, Hausaufgabe, Wettbewerb, Dokume
 #show: stil.with(akzent: rgb("#a33b2b"), schrift: "Libron")
 ```
 
-Libron wirkt bei gleicher Punktgröße größer und wird deshalb automatisch auf 90 % gesetzt. 12 pt sehen damit in beiden Schriften gleich groß aus. Fehlt eine Schrift, nimmt Typst New Computer Modern.
+Libron wirkt bei gleicher Punktgröße sehr groß und wird deshalb automatisch auf 90 % gesetzt. Fehlt eine Schrift, nimmt Typst New Computer Modern.
 
 ## 2 Aufgaben
 

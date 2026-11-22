@@ -118,7 +118,7 @@ static BUILTIN: &[Builtin] = &[
     Builtin {
         id: "leer",
         name: "Leeres Dokument",
-        description: "Nur der Grundstil: A4, Deutsch, Charter 12 pt, Aufgaben und Teilaufgaben.",
+        description: "Nur der Grundstil: A4, Deutsch, New Computer Modern 12 pt, Aufgaben und Teilaufgaben.",
         category: "Allgemein",
         files: &[tpl_file!("leer", "main.typ"), STIL],
     },
@@ -415,6 +415,53 @@ mod tests {
             }
             assert!(preview_svg(t.id).unwrap().starts_with("<svg"));
         }
+    }
+
+    /// Die Regeln aus stil.typ: Dezimalkomma, Einheiten, Formelnummern und
+    /// Farben, die nur in ihrem Bereich gelten. Die Prüfungen laufen in Typst.
+    #[test]
+    fn stil_rules() {
+        let dir = std::env::temp_dir().join("neotypst-stil-test");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("templates")).unwrap();
+        std::fs::write(dir.join("templates/stil.typ"), STIL.1).unwrap();
+        let main = r#"#import "templates/stil.typ": *
+#show: stil
+
+// Dezimalkomma ja, Argument-Kommas nein
+#assert(_neu($0,4871$.body) != none)
+#assert(_neu($f(x, y)$.body) == none)
+#assert(_neu($x_(0,5)$.body) != none)
+#assert(_neu($(0,5)/(1,5)$.body) != none)
+// Einheiten nur direkt nach einer Zahl, einbuchstabige nur mit Leerzeichen
+#assert(_neu($8 s$.body) != none)
+#assert(_neu($100 km/h$.body) != none)
+#assert(_neu($3,5 m/s^2$.body) != none)
+#assert(_neu($2s$.body) == none)
+#assert(_neu($v = s/t$.body) == none)
+#assert(_neu($2 x$.body) == none)
+
+// Nummerierte Formeln zählen einfach, auch wenn die Regel sie ändert
+#set math.equation(numbering: "(1)")
+$ 0,5 + 8 s $ <a>
+$ x = y $
+$ 1,25 km $ <b>
+#context assert.eq(counter(math.equation).get().first(), 3)
+Siehe @a und @b.
+
+// Eine Akzentfarbe gilt nur in ihrem Bereich
+#[
+  #show: stil.with(akzent: red, kasten: blue)
+  #context assert.eq(_akzent.get().last(), red)
+]
+#context assert.eq(_akzent.get().last(), black)
+#context assert.eq(_kasten.get().last(), luma(244))
+"#;
+        std::fs::write(dir.join("main.typ"), main).unwrap();
+        let mut engine = Engine::new();
+        engine.open(dir, "main.typ".into()).unwrap();
+        let out = engine.compile(None, None).unwrap();
+        assert!(out.errors().is_empty(), "stil.typ: {:?}", out.errors());
     }
 
     #[test]

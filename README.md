@@ -8,6 +8,7 @@ Tauri 2 · React · CodeMirror 6 · Typst 0.15 (direkt eingebunden, keine CLI un
 
 - **Live-Vorschau** wie in der Typst-Web-App, Klick in die Vorschau springt zum Code, Trackpad-Pinch zum Zoomen
 - **Vorlagen** mit Formular: Arbeitsblatt (mit Lösungsversion), Hausaufgabe, Wettbewerb, Dokumentation, Essay, leer, dazu eigene Vorlagen
+- **Offline:** Compiler, Vorschau, Schriften, Rechtschreibung und die gängigen Pakete (CeTZ, Fletcher, Lilaq, Physica, Zero, Zap …) stecken in der App. Ins Netz geht NeoTypst nur für andere Pakete beim ersten Gebrauch, für die Literatursuche per DOI/ISBN und für die Update-Prüfung
 - **Einheitlicher Stil** für alle Vorlagen: Aufgaben, Teilaufgaben, doppelt unterstrichene Ergebnisse, Dezimalkomma ohne Abstand, Einheiten ohne Anführungszeichen (`$100 km/h$`)
 - **Bausteine** per Abkürzung + Tab, **Befehlspalette** (⌘K), **Vim-Modus**, Autovervollständigung von Typst selbst
 - **Tabellen-Editor** und **Matrix-Editor** als Gitter, die bestehende Tabellen und Matrizen einlesen
@@ -121,11 +122,13 @@ Räumt den Typst-Code auf: Einrückung, Abstände um `=` und nach Kommas, lange 
 | `tbl3x4` | Tabelle mit 3 Zeilen (inkl. Kopfzeile) × 4 Spalten, Tab springt von Zelle zu Zelle |
 | `mat2x3` | Matrix 2 × 3 |
 | `grid3` | drei Spalten nebeneinander |
-| `aufgabe`, `teil`, `platz`, `merke`, `loesung` | Arbeitsblatt |
+| `aufgabe`, `aufgabet`, `teil`, `teile`, `erg`, `antwort`, `aufgabel`, `platz`, `merke`, `loesung` | Aufgaben und Arbeitsblatt |
 | `eq`, `ali`, `frac`, `vec`, `cases`, `int`, `sum`, `lim`, `abl`, `einheit` | Mathe |
 | `fig`, `figt` | Abbildung / Tabelle mit Beschriftung |
 | `code`, `codefile`, `hinweis` | Informatik |
 | `wertetabelle`, `tblcsv` | Wertetabelle / Tabelle aus CSV |
+
+In der Vorschlagsliste wählen Ctrl-J/Ctrl-K (wie in Vim), Ctrl-N/Ctrl-P oder ↑/↓ einen Eintrag, Tab oder ↩ übernimmt ihn, Esc schließt die Liste. Ctrl-Leertaste öffnet sie von Hand.
 
 Alle Bausteine findest du auch in der Befehlspalette, z. B. „tabelle 3x4“.
 

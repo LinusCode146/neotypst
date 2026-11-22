@@ -19,7 +19,7 @@
 
   // Ohne Fettdruck: Überschriften unterscheiden sich nur durch die Größe,
   // *betont* wird kursiv.
-  show heading: set text(weight: "regular")
+  show heading: set text(weight: "regular", tracking: 0em)
   // Feste Größen, weil stil.typ die Überschriften schon relativ vergrößert.
   show heading.where(level: 1): set text(size: 15pt)
   show heading.where(level: 2): set text(size: 13pt)
