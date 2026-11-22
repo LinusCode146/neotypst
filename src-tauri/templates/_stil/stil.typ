@@ -31,15 +31,111 @@
   type(c) == content and c.has("text") and type(c.text) == str and c.text.match(muster) != none
 )
 
-// Steht ab Position i (nach höchstens einem Leerzeichen) eine Einheit in
-// Anführungszeichen, z. B. "s" oder "m/s"^2? Dann deren Position, sonst none.
-#let _einheit-ab(ch, i) = {
-  if i < ch.len() and ch.at(i).func() == [ ].func() { i += 1 }
+// ─── Einheiten ─────────────────────────────────────────────────────────────
+// Direkt nach einer Zahl werden Einheiten erkannt und aufrecht mit schmalem
+// Abstand gesetzt: $100 km/h$, $3,5 m/s^2$, $9,81 N/kg$, $20 °C$.
+// Ohne Zahl davor bleibt alles Formel: $v = s/t$ hat kursive Variablen.
+
+// Einbuchstabige Einheiten. Typst liest sie als Variablen (`symbol`).
+#let _einheit-zeichen = (
+  "m", "s", "g", "h", "l", "L", "t",
+  "N", "V", "A", "W", "J", "K", "C", "F", "T", "H", "S", "Ω", "°", "%",
+)
+
+#let _ist-symbol(c) = type(c) == content and repr(c.func()) == "symbol"
+#let _leer = [ ].func()
+
+/// Ist c eine Einheit? Mit folge: true auch mehrere Einheiten hintereinander
+/// wie `kg m` (für Zähler und Nenner von km/h, kg m/s^2 …).
+#let _ist-einheit(c, folge: false) = {
+  if type(c) != content { return false }
+  let f = c.func()
+  // Text in Anführungszeichen und die vordefinierten Namen (km, kg, …)
+  if f == text { return c.text.match(regex("^[\pL°µ]")) != none }
+  if _ist-symbol(c) { return c.text in _einheit-zeichen }
+  if f == math.attach { return _ist-einheit(c.base) }
+  if f == math.frac { return _ist-einheit(c.num, folge: true) and _ist-einheit(c.denom, folge: true) }
+  if folge and f == _seq {
+    let teile = c.children.filter(x => x.func() != _leer)
+    return teile.len() > 0 and teile.all(x => _ist-einheit(x) or (x.has("text") and x.text == "⋅"))
+  }
+  false
+}
+
+/// Setzt eine erkannte Einheit aufrecht; Brüche werden zu km/h in einer Zeile.
+#let _einheit-satz(c) = {
+  let f = c.func()
+  if f == math.frac { return [#_einheit-satz(c.num)#sym.slash#_einheit-satz(c.denom)] }
+  if f == math.attach {
+    let felder = c.fields()
+    let base = felder.remove("base")
+    return math.attach(_einheit-satz(base), ..felder)
+  }
+  if f == _seq {
+    return c.children.map(x => if x.func() == _leer { math.thin } else { _einheit-satz(x) }).join()
+  }
+  if _ist-symbol(c) { return math.upright(c) }
+  c
+}
+
+// Vordefinierte Einheiten mit mehreren Buchstaben, damit $100 km/h$ ohne
+// Anführungszeichen geht. Nicht dabei, weil Typst die Namen schon belegt:
+// min, bar, cal, deg – dafür "min", "bar", "kcal" in Anführungszeichen.
+#let km = "km"
+#let dm = "dm"
+#let cm = "cm"
+#let mm = "mm"
+#let nm = "nm"
+#let kg = "kg"
+#let mg = "mg"
+#let ms = "ms"
+#let ns = "ns"
+#let ml = "ml"
+#let mL = "mL"
+#let Hz = "Hz"
+#let kHz = "kHz"
+#let MHz = "MHz"
+#let GHz = "GHz"
+#let kN = "kN"
+#let kJ = "kJ"
+#let MJ = "MJ"
+#let kW = "kW"
+#let MW = "MW"
+#let mW = "mW"
+#let Wh = "Wh"
+#let kWh = "kWh"
+#let mA = "mA"
+#let kV = "kV"
+#let mV = "mV"
+#let Pa = "Pa"
+#let hPa = "hPa"
+#let kPa = "kPa"
+#let mol = "mol"
+#let eV = "eV"
+#let keV = "keV"
+#let MeV = "MeV"
+#let Ohm = "Ω"
+#let kOhm = "kΩ"
+#let MOhm = "MΩ"
+#let dB = "dB"
+#let rad = "rad"
+#let Bq = "Bq"
+#let Wb = "Wb"
+#let lx = "lx"
+#let lm = "lm"
+
+// Position der Einheit nach der Zahl, sonst none. Einbuchstabige Einheiten
+// brauchen ein Leerzeichen: `8 s` ist eine Zeit, `2s` bleibt 2 mal s.
+// Einheiten in Anführungszeichen und km, kg, … gehen auch ohne Leerzeichen.
+#let _einheit-nach(ch, i) = {
   if i >= ch.len() { return none }
+  if ch.at(i).func() == _leer {
+    if i + 1 < ch.len() and _ist-einheit(ch.at(i + 1)) { return i + 1 }
+    return none
+  }
   let c = ch.at(i)
   let kern = if c.func() == math.attach { c.base } else { c }
-  // Einheiten sind `text`, Variablen wie x sind `symbol`.
-  if type(kern) == content and kern.func() == text and kern.text.match(regex("^[\pL°%]")) != none { i } else { none }
+  if kern.func() == text and _ist-einheit(c) { i } else { none }
 }
 
 #let _dezimal(body) = {
@@ -58,11 +154,24 @@
         // 0,4871: Komma ohne Abstand
         neu.push(_komma)
         geaendert = true
-      } else if _ist-text(c, regex("\d$")) and _einheit-ab(ch, i + 1) != none {
-        // 8 "s": schmaler Abstand zwischen Zahl und Einheit
+      } else if _ist-text(c, regex("\\d$")) and _einheit-nach(ch, i + 1) != none {
+        // 100 km/h: schmaler Abstand, Einheiten aufrecht, auch mehrere
+        // hintereinander wie N m oder °C
         neu.push(c)
+        let j = _einheit-nach(ch, i + 1)
         neu.push(math.thin)
-        i = _einheit-ab(ch, i + 1) - 1
+        neu.push(_einheit-satz(ch.at(j)))
+        i = j
+        while true {
+          if i + 1 < ch.len() and _ist-einheit(ch.at(i + 1)) {
+            neu.push(_einheit-satz(ch.at(i + 1)))
+            i += 1
+          } else if i + 2 < ch.len() and ch.at(i + 1).func() == _leer and _ist-einheit(ch.at(i + 2)) {
+            neu.push(math.thin)
+            neu.push(_einheit-satz(ch.at(i + 2)))
+            i += 2
+          } else { break }
+        }
         geaendert = true
       } else {
         let d = _dezimal(c)
@@ -127,12 +236,13 @@
     )[
       // Aufzählungen in der Aufgabenstellung sind Teilaufgaben.
       #set enum(numbering: "a)")
-      #grid(
+      // Etwas Luft unter dem Kopf; Schriften mit hohen Oberlängen wie Libron
+      // stoßen sonst an die erste Textzeile.
+      #block(below: 0.85em, grid(
         columns: (1fr, auto),
         text(fill: ak, weight: "bold")[Aufgabe #nummer#if titel != none [#h(0.6em)#text(fill: black)[#titel]]],
         if punkte != none { text(size: 0.85em, fill: luma(90))[#punkte P.] },
-      )
-      #v(0.5em, weak: true)
+      ))
       #body
     ]
   }
@@ -227,7 +337,9 @@
   show heading: set block(above: 1.6em, below: 0.8em)
 
   // Code
-  show raw: set text(font: ("Menlo", "DejaVu Sans Mono"), size: 0.9em)
+  // Code in fester Größe relativ zur Grundgröße: Typst verkleinert raw
+  // ohnehin auf 0,8 em, und neben Libron wirkte Code sonst zu klein.
+  show raw: set text(font: ("Menlo", "DejaVu Sans Mono"), size: groesse * 0.8)
   show raw.where(block: true): block.with(
     width: 100%, fill: luma(246), inset: 8pt, radius: 3pt,
   )

@@ -7,7 +7,8 @@ Tauri 2 · React · CodeMirror 6 · Typst 0.15 (direkt eingebunden, keine CLI un
 ## Funktionen im Überblick
 
 - **Live-Vorschau** wie in der Typst-Web-App, Klick in die Vorschau springt zum Code, Trackpad-Pinch zum Zoomen
-- **Vorlagen** mit Formular: Arbeitsblatt (mit Lösungsversion), Hausaufgabe, Wettbewerb, Dokumentation, leer, dazu eigene Vorlagen
+- **Vorlagen** mit Formular: Arbeitsblatt (mit Lösungsversion), Hausaufgabe, Wettbewerb, Dokumentation, Essay, leer, dazu eigene Vorlagen
+- **Einheitlicher Stil** für alle Vorlagen: Aufgaben, Teilaufgaben, doppelt unterstrichene Ergebnisse, Dezimalkomma ohne Abstand, Einheiten ohne Anführungszeichen (`$100 km/h$`)
 - **Bausteine** per Abkürzung + Tab, **Befehlspalette** (⌘K), **Vim-Modus**, Autovervollständigung von Typst selbst
 - **Tabellen-Editor** und **Matrix-Editor** als Gitter, die bestehende Tabellen und Matrizen einlesen
 - **Formeln:** Hervorhebung, unbekannter Text wird automatisch zu `"Text"`, Symbolpalette mit deutschen Suchbegriffen
@@ -131,6 +132,16 @@ Alle Bausteine findest du auch in der Befehlspalette, z. B. „tabelle 3x4“.
 ## Vorlagen
 
 Beim Anlegen fragt ein kurzes Formular die Felder der Vorlage ab (Titel, Fach, Klasse, Name, Datum …). Felder mit „gemerkt“ werden fürs nächste Projekt vorausgefüllt. Die Vorschaubilder sind die echte erste Seite, gerendert mit Typst.
+
+Alle eingebauten Vorlagen bauen auf `stil.typ` auf (Quelle: `src-tauri/templates/_stil/`). Die Datei landet als `templates/stil.typ` in jedem neuen Projekt, die Regeln stehen in `src-tauri/templates/_stil/STIL.md`:
+
+```typst
+#aufgabe(titel: "Freier Fall", punkte: 3)[Ein Stein fällt aus $20 m$ Höhe …]
+#teil[$ t = sqrt((2s)/g) approx erg(2,02 s) $]
+#antwort[Der Fall dauert etwa 2 s.]
+```
+
+Die Essay-Vorlage nutzt nur die Grundschrift: Deckblatt mit Fragestellung und Angaben, danach Text im Blocksatz, ohne Fettdruck und ohne Farbe.
 
 **Eigene Vorlagen:** Über ⌘K → „Projekt als Vorlage speichern“ wird ein Projekt nach `~/Documents/Typst/_Vorlagen/<Name>/` kopiert. In den .typ-Dateien werden Platzhalter wie `{{titel}}` und `{{datum}}` beim Anlegen ausgefüllt. Weitere Felder legst du in `vorlage.json` fest:
 

@@ -102,7 +102,12 @@ Regeln:
 - **Dezimalkomma:** einfach `0,4871` schreiben. Das Paket entfernt den Abstand, den Typst sonst nach dem Komma setzt. Bei `f(x, y)` bleibt der Abstand erhalten.
 - **Ausnahme:** In Funktionsargumenten trennt Typst an jedem Komma. `erg(0,4871)` setzt die Zahl wieder zusammen. Bei anderen Funktionen wie `sqrt(…)` die Zahl in Anführungszeichen schreiben, etwa `sqrt("2,25")`, oder `2.25` verwenden.
 - Prozent mit Leerzeichen: `48,7 %`
-- Einheiten aufrecht in Anführungszeichen: `3,5 "m/s"^2`, `100 "km/h"`. Den schmalen Abstand zwischen Zahl und Einheit setzt das Paket automatisch.
+- **Einheiten** direkt hinter die Zahl schreiben, ohne Anführungszeichen: `100 km/h`, `3,5 m/s^2`, `9,81 N/kg`, `20 °C`, `47 Ohm`, `2 kWh`, `5 N m`. Der Stil erkennt sie, setzt sie aufrecht und mit schmalem Abstand. Brüche aus Einheiten werden zu km/h in einer Zeile.
+  - Erkannt wird nur direkt nach einer Zahl. Ohne Zahl davor bleibt es Formel: `v = s/t` hat kursive Variablen.
+  - Einbuchstabige Einheiten: m, s, g, h, l, L, t, N, V, A, W, J, K, C, F, T, H, S, Ω, °.
+  - Mehrbuchstabige sind vordefiniert: km, dm, cm, mm, nm, kg, mg, ms, ns, ml, mL, Hz, kHz, MHz, GHz, kN, kJ, MJ, kW, MW, mW, Wh, kWh, mA, kV, mV, Pa, hPa, kPa, mol, eV, keV, MeV, Ohm (Ω), kOhm, MOhm, dB, rad, Bq, Wb, lx, lm.
+  - Was fehlt oder mit Typst-Namen kollidiert (min, bar, kcal …), in Anführungszeichen: `10 "min"`. Das funktioniert für jede Einheit.
+  - Zwischen Zahl und einbuchstabiger Einheit steht ein Leerzeichen: `8 s` ist eine Zeit, `2s` bleibt das Produkt 2 mal s. Produkte mit Variablen deshalb ohne Leerzeichen schreiben: `2m a`, `(2s)/g`.
 - Text in Formeln aufrecht in Anführungszeichen: `P("Mädchen")`, nicht `P(Mädchen)`.
 - Große Zahlen mit schmalem Abstand in Dreiergruppen: `139 thin 838`
 

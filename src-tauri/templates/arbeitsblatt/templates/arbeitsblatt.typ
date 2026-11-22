@@ -2,8 +2,8 @@
 // Lösungen werden über den Schalter „Lösungen“ im Editor ein- und
 // ausgeblendet (sys.inputs.loesungen).
 
-#import "stil.typ" as s
-#import "stil.typ": stil, teil, erg, antwort, betont
+#import "stil.typ" as stil-modul
+#import "stil.typ": *
 
 #let loesungen = sys.inputs.at("loesungen", default: "false") == "true"
 #let grau = luma(110)
@@ -66,7 +66,7 @@
 /// Die Lösung erscheint nur, wenn „Lösungen“ eingeschaltet ist.
 #let aufgabe(punkte: none, titel: none, nr: auto, body, ..loesung) = {
   if punkte != none { _punkte.update(p => p + punkte) }
-  s.aufgabe(titel: titel, punkte: punkte, nr: nr, body)
+  stil-modul.aufgabe(titel: titel, punkte: punkte, nr: nr, body)
   let l = loesung.pos()
   if loesungen and l.len() > 0 {
     block(

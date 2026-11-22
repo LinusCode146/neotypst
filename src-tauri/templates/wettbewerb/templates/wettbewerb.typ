@@ -1,7 +1,7 @@
 // Lösungen für Wettbewerbe (z. B. Mathe-/Physik-Olympiade, Bundeswettbewerb),
 // aufgebaut auf stil.typ.
 
-#import "stil.typ": stil, teil, erg, betont, _kasten
+#import "stil.typ": *
 
 #let grau = luma(110)
 

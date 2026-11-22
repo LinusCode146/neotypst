@@ -109,6 +109,13 @@ static BUILTIN: &[Builtin] = &[
         files: &[tpl_file!("dokumentation", "main.typ"), tpl_file!("dokumentation", "templates/dokumentation.typ"), STIL],
     },
     Builtin {
+        id: "essay",
+        name: "Essay",
+        description: "Deckblatt mit Fragestellung und Angaben, danach schlichter Text im Blocksatz.",
+        category: "Allgemein",
+        files: &[tpl_file!("essay", "main.typ"), tpl_file!("essay", "templates/essay.typ"), STIL],
+    },
+    Builtin {
         id: "leer",
         name: "Leeres Dokument",
         description: "Nur der Grundstil: A4, Deutsch, Charter 12 pt, Aufgaben und Teilaufgaben.",
@@ -179,6 +186,13 @@ fn builtin_fields(id: &str) -> Vec<Field> {
             titel("Projektdokumentation"),
             field("untertitel", "Untertitel", "z. B. Softwareprojekt Klasse 12", "Projektdokumentation"),
             name(),
+            datum(),
+        ],
+        "essay" => vec![
+            field("titel", "Fragestellung", "z. B. Darf man lügen, um Leben zu retten?", "Darf man lügen, um Leben zu retten?"),
+            name(),
+            Field { remember: true, ..field("kurs", "Kurs", "z. B. Philosophie Q1", "") },
+            Field { remember: true, ..field("lehrkraft", "Lehrkraft", "optional", "") },
             datum(),
         ],
         _ => vec![titel("Dokument")],
