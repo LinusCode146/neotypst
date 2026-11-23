@@ -47,6 +47,8 @@
   t != none and t != "" and _ziffern.contains(t.last())
 }
 #let _beginnt-ziffer(c) = {
+  // 0,515^2: nach dem Komma steht die Ziffernfolge als Basis einer Potenz.
+  if type(c) == content and c.func() == math.attach { return _beginnt-ziffer(c.base) }
   let t = _text-von(c)
   t != none and t != "" and _ziffern.contains(t.first())
 }
