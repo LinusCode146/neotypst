@@ -22,24 +22,13 @@ import { beforeRestart, checkForUpdate } from "./updater";
 import { GRAPHICS, type GraphicBlock } from "./graphics";
 import type { SymbolEntry } from "./symbolData";
 import { isMac, kbd, modKey } from "./platform";
+import { outlineOf } from "./outline";
 
 type Toast = { text: string; kind?: "error"; actions?: { label: string; run(): void }[] };
 type Menu = { x: number; y: number; items: MenuItem[] };
 
 const IMAGE_EXT = /\.(png|jpe?g|gif|svg|webp)$/i;
 
-/** Headings (`= Titel`) of the current file, ignoring raw blocks. */
-function outlineOf(text: string) {
-  const out: { level: number; title: string; line: number }[] = [];
-  let inRaw = false;
-  text.split("\n").forEach((l, i) => {
-    if (/^\s*```/.test(l)) inRaw = !inRaw;
-    if (inRaw) return;
-    const m = l.match(/^(=+)\s+(.+?)\s*(<[\w-:.]+>)?\s*$/);
-    if (m) out.push({ level: m[1].length, title: m[2], line: i + 1 });
-  });
-  return out;
-}
 
 export function Workspace({ project, onClose }: { project: OpenedProject; onClose(): void }) {
   const settings = useSettings();

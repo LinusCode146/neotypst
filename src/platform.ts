@@ -3,14 +3,14 @@
 export const isMac = /Mac|iPhone|iPad/.test(navigator.userAgent);
 
 /** Die Befehlstaste: ⌘ auf dem Mac, Strg unter Windows (aber nicht AltGr, das als Strg+Alt ankommt). */
-export const modKey = (e: KeyboardEvent | React.KeyboardEvent): boolean =>
-  isMac ? e.metaKey : e.ctrlKey && !e.getModifierState("AltGraph");
+export const modKey = (e: KeyboardEvent | React.KeyboardEvent, mac = isMac): boolean =>
+  mac ? e.metaKey : e.ctrlKey && !e.getModifierState("AltGraph");
 
 const tasten: Record<string, string> = { "↩": "Eingabe", "⌫": "Rücktaste", "−": "-" };
 
 /** Schreibt Mac-Kürzel in einem Text für Windows um: „⌘⇧E“ → „Strg+Umschalt+E“. */
-export function kbd(text: string): string {
-  if (isMac) return text;
+export function kbd(text: string, mac = isMac): string {
+  if (mac) return text;
   return text.replace(/([⌃⌥⇧⌘]+)(.)/gu, (_, mods: string, key: string) => {
     const teile: string[] = [];
     if (mods.includes("⌘") || mods.includes("⌃")) teile.push("Strg");
