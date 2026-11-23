@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type FileEntry } from "./api";
 import { Icon } from "./icons";
+import { kbd, modKey } from "./platform";
 
 type Match = { from: number; to: number; line: number; pre: string; text: string; post: string };
 type FileHits = { path: string; matches: Match[] };
@@ -243,10 +244,10 @@ export function SearchPanel(p: SearchPanelProps) {
                 onChange={(e) => setReplacement(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Escape") p.close();
-                  else if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && total) void replaceAll();
+                  else if (e.key === "Enter" && modKey(e) && total) void replaceAll();
                 }}
               />
-              <button className="opt" title="Alle ersetzen (⌘↩)" disabled={!total} onClick={() => void replaceAll()}>
+              <button className="opt" title={kbd("Alle ersetzen (⌘↩)")} disabled={!total} onClick={() => void replaceAll()}>
                 Alle
               </button>
             </div>

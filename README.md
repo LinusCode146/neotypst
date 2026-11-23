@@ -1,6 +1,6 @@
 # NeoTypst
 
-Ein Typst-Editor für macOS, gemacht für Arbeitsblätter in Mathe und Physik, Hausaufgaben, Wettbewerbe und Informatik-Dokumentationen.
+Ein Typst-Editor für macOS und Windows, gemacht für Arbeitsblätter in Mathe und Physik, Hausaufgaben, Wettbewerbe und Informatik-Dokumentationen.
 
 Tauri 2 · React · CodeMirror 6 · Typst 0.15 (direkt eingebunden, keine CLI und kein Language Server nötig)
 
@@ -248,6 +248,7 @@ Die Update-Pakete sind mit einem eigenen Schlüssel signiert. Die App installier
 1. Version in `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` und `package.json` erhöhen
 2. Release-Notizen nach `release-notes/vX.Y.Z.md` schreiben (sie erscheinen auch in der Update-Karte)
 3. `scripts/release.sh` ausführen. Das Skript baut die App getrennt für Apple Silicon und Intel, signiert die Update-Pakete mit `~/.tauri/neotypst.key` und lädt je ein DMG und ein Update-Paket sowie `latest.json` als GitHub-Release hoch.
+4. Sobald das Release veröffentlicht ist, baut der Workflow `.github/workflows/windows.yml` auf GitHub den Windows-Installer, hängt `NeoTypst_X.Y.Z_Windows-Setup.exe` an das Release und trägt Windows in `latest.json` ein. Dafür braucht das Repository das Secret `TAURI_SIGNING_PRIVATE_KEY` mit dem Inhalt von `~/.tauri/neotypst.key`. Unter Actions → Windows → „Run workflow“ gibt es einen Test-Build ohne Release.
 
 Der private Schlüssel `~/.tauri/neotypst.key` gehört nicht ins Repository. Geht er verloren, können bestehende Installationen keine Updates mehr annehmen. Bewahre also eine Sicherungskopie auf, etwa im Passwortmanager.
 

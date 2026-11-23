@@ -21,6 +21,7 @@ import { SearchPanel } from "./SearchPanel";
 import { beforeRestart, checkForUpdate } from "./updater";
 import { GRAPHICS, type GraphicBlock } from "./graphics";
 import type { SymbolEntry } from "./symbolData";
+import { isMac, kbd, modKey } from "./platform";
 
 type Toast = { text: string; kind?: "error"; actions?: { label: string; run(): void }[] };
 type Menu = { x: number; y: number; items: MenuItem[] };
@@ -776,7 +777,9 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
   // Global shortcuts.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!e.metaKey) return;
+      if (!modKey(e)) return;
+      // Unter Windows ist die Befehlstaste Strg: Strg-J/K/N/P gehören dann der Vorschlagsliste.
+      if (!isMac && document.querySelector(".cm-tooltip-autocomplete")) return;
       const k = e.key.toLowerCase();
       if (k === "k") {
         e.preventDefault();
@@ -876,11 +879,11 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
     if (palette === "files") return fileItems;
 
     const actions: PaletteItem[] = [
-      { id: "export", label: "Als PDF exportieren", detail: "⌘E", group: "Aktionen", icon: <Icon.export />, run: () => exportPdf(false) },
+      { id: "export", label: "Als PDF exportieren", detail: kbd("⌘E"), group: "Aktionen", icon: <Icon.export />, run: () => exportPdf(false) },
       {
         id: "export-both",
         label: "PDF exportieren: Aufgaben + Lösungen",
-        detail: "⌘⇧E",
+        detail: kbd("⌘⇧E"),
         keywords: "beide loesung",
         group: "Aktionen",
         icon: <Icon.export />,
@@ -889,7 +892,7 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
       {
         id: "solutions",
         label: solutions ? "Lösungen ausblenden" : "Lösungen einblenden",
-        detail: "⌘⇧L",
+        detail: kbd("⌘⇧L"),
         keywords: "loesung",
         group: "Aktionen",
         icon: <Icon.eye />,
@@ -898,7 +901,7 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
       {
         id: "convert-table",
         label: "Markdown-Tabelle in Typst umwandeln",
-        detail: "⌘⇧T",
+        detail: kbd("⌘⇧T"),
         keywords: "pipe tabelle",
         group: "Aktionen",
         icon: <Icon.table />,
@@ -907,7 +910,7 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
       {
         id: "literature",
         label: "Literatur & Zitate …",
-        detail: "⌘⇧B",
+        detail: kbd("⌘⇧B"),
         keywords: "literatur zitat quelle bibliography doi isbn cite bib",
         group: "Aktionen",
         icon: <Icon.book />,
@@ -916,7 +919,7 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
       {
         id: "graphics",
         label: "Grafik einfügen …",
-        detail: "⌘⇧G",
+        detail: kbd("⌘⇧G"),
         keywords: "grafik diagramm plot koordinatensystem schaltkreis flussdiagramm",
         group: "Aktionen",
         icon: <Icon.chart />,
@@ -934,7 +937,7 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
       {
         id: "symbols",
         label: "Symbolpalette öffnen",
-        detail: "⌘⇧S",
+        detail: kbd("⌘⇧S"),
         keywords: "symbol griechisch pfeil zeichen sonderzeichen",
         group: "Aktionen",
         icon: <Icon.math />,
@@ -943,7 +946,7 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
       {
         id: "table-editor",
         label: "Tabellen-Editor öffnen",
-        detail: "⌘T",
+        detail: kbd("⌘T"),
         keywords: "tabelle grid bearbeiten",
         group: "Aktionen",
         icon: <Icon.table />,
@@ -952,7 +955,7 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
       {
         id: "matrix-editor",
         label: "Matrix-Editor öffnen",
-        detail: "⌘T in Formeln",
+        detail: kbd("⌘T in Formeln"),
         keywords: "matrix mat vektor vec determinante lgs gauß",
         group: "Aktionen",
         icon: <Icon.table />,
@@ -969,7 +972,7 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
       {
         id: "project-search",
         label: "Im Projekt suchen und ersetzen",
-        detail: "⌘⇧F",
+        detail: kbd("⌘⇧F"),
         keywords: "suchen finden ersetzen replace search alle dateien",
         group: "Aktionen",
         icon: <Icon.search />,
@@ -978,7 +981,7 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
       {
         id: "format",
         label: "Dokument formatieren",
-        detail: "⌥⇧F",
+        detail: kbd("⌥⇧F"),
         keywords: "format formatieren aufräumen einrücken typstyle auswahl",
         group: "Aktionen",
         icon: <Icon.code />,
@@ -1026,7 +1029,7 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
       { id: "ln", label: `Zeilennummern ${settings.lineNumbers ? "aus" : "an"}`, group: "Einstellungen", icon: <Icon.settings />, run: () => setSettings({ lineNumbers: !settings.lineNumbers }) },
       { id: "mathquote", label: `Text in Formeln automatisch quoten ${settings.mathQuote ? "aus" : "an"}`, group: "Einstellungen", icon: <Icon.settings />, run: () => setSettings({ mathQuote: !settings.mathQuote }) },
       { id: "wrap", label: `Zeilenumbruch ${settings.wrap ? "aus" : "an"}`, group: "Einstellungen", icon: <Icon.settings />, run: () => setSettings({ wrap: !settings.wrap }) },
-      { id: "sidebar", label: `Seitenleiste ${settings.sidebar ? "ausblenden" : "einblenden"}`, detail: "⌘\\", group: "Einstellungen", icon: <Icon.sidebar />, run: () => setSettings({ sidebar: !settings.sidebar }) },
+      { id: "sidebar", label: `Seitenleiste ${settings.sidebar ? "ausblenden" : "einblenden"}`, detail: kbd("⌘\\"), group: "Einstellungen", icon: <Icon.sidebar />, run: () => setSettings({ sidebar: !settings.sidebar }) },
       { id: "font+", label: "Editor-Schrift größer", detail: `${settings.fontSize}px`, group: "Einstellungen", icon: <Icon.zoomIn />, run: () => setSettings({ fontSize: Math.min(24, settings.fontSize + 1) }) },
       { id: "font-", label: "Editor-Schrift kleiner", detail: `${settings.fontSize}px`, group: "Einstellungen", icon: <Icon.zoomOut />, run: () => setSettings({ fontSize: Math.max(10, settings.fontSize - 1) }) },
       { id: "theme-system", label: "Design: wie System", keywords: "theme dark light", group: "Einstellungen", icon: <Icon.settings />, run: () => setSettings({ theme: "system" }) },
@@ -1145,7 +1148,7 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
         <button className="icon-btn" title="Projektübersicht" onClick={onClose}>
           <Icon.home />
         </button>
-        <button className={"icon-btn" + (settings.sidebar ? " on" : "")} title="Seitenleiste (⌘\)" onClick={() => setSettings({ sidebar: !settings.sidebar })}>
+        <button className={"icon-btn" + (settings.sidebar ? " on" : "")} title={kbd("Seitenleiste (⌘\\)")} onClick={() => setSettings({ sidebar: !settings.sidebar })}>
           <Icon.sidebar />
         </button>
         <div className="crumbs" data-tauri-drag-region>
@@ -1159,34 +1162,34 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
           {dirty && <span className="dirty" title="Ungespeicherte Änderungen" />}
         </div>
         <div className="spacer" data-tauri-drag-region />
-        <button className="icon-btn" title="Literatur & Zitate (⌘⇧B)" onClick={() => setLitOpen(true)}>
+        <button className="icon-btn" title={kbd("Literatur & Zitate (⌘⇧B)")} onClick={() => setLitOpen(true)}>
           <Icon.book />
         </button>
-        <button className="icon-btn" title="Grafik einfügen (⌘⇧G)" onClick={() => setGraphicsOpen(true)}>
+        <button className="icon-btn" title={kbd("Grafik einfügen (⌘⇧G)")} onClick={() => setGraphicsOpen(true)}>
           <Icon.chart />
         </button>
-        <button className="icon-btn" title="Symbole (⌘⇧S)" onClick={() => setSymbolsOpen(true)}>
+        <button className="icon-btn" title={kbd("Symbole (⌘⇧S)")} onClick={() => setSymbolsOpen(true)}>
           <Icon.math />
         </button>
-        <button className="icon-btn" title="Tabellen-Editor (⌘T) – in Formeln: Matrix-Editor" onClick={openGridEditor}>
+        <button className="icon-btn" title={kbd("Tabellen-Editor (⌘T) – in Formeln: Matrix-Editor")} onClick={openGridEditor}>
           <Icon.table />
         </button>
         <button className="btn ghost" onClick={() => setPalette("all")} title="Befehle, Bausteine, Dateien">
-          <Icon.search /> <span style={{ color: "var(--muted)" }}>Befehle</span> <kbd>⌘K</kbd>
+          <Icon.search /> <span style={{ color: "var(--muted)" }}>Befehle</span> <kbd>{kbd("⌘K")}</kbd>
         </button>
         <div className="divider" />
-        <button className={"toggle" + (solutions ? " on" : "")} onClick={toggleSolutions} title="Lösungen ein-/ausblenden (⌘⇧L)">
+        <button className={"toggle" + (solutions ? " on" : "")} onClick={toggleSolutions} title={kbd("Lösungen ein-/ausblenden (⌘⇧L)")}>
           <span className="knob" /> Lösungen
         </button>
         <div className="divider" />
         <div className="group">
-          <button className="icon-btn" title="Verkleinern (⌘−)" onClick={() => zoom(settings.zoom / 1.15)}>
+          <button className="icon-btn" title={kbd("Verkleinern (⌘−)")} onClick={() => zoom(settings.zoom / 1.15)}>
             <Icon.zoomOut />
           </button>
-          <button className="btn ghost zoom-label" style={{ padding: 0 }} title="An Breite anpassen (⌘0)" onClick={() => zoom(1)}>
+          <button className="btn ghost zoom-label" style={{ padding: 0 }} title={kbd("An Breite anpassen (⌘0)")} onClick={() => zoom(1)}>
             {Math.round(settings.zoom * 100)}%
           </button>
-          <button className="icon-btn" title="Vergrößern (⌘+)" onClick={() => zoom(settings.zoom * 1.15)}>
+          <button className="icon-btn" title={kbd("Vergrößern (⌘+)")} onClick={() => zoom(settings.zoom * 1.15)}>
             <Icon.zoomIn />
           </button>
         </div>
@@ -1200,8 +1203,8 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
               x: r.right - 240,
               y: r.bottom + 6,
               items: [
-                { label: "PDF exportieren", detail: "⌘E", run: () => exportPdf(false) },
-                { label: "Aufgaben + Lösungen exportieren", detail: "⌘⇧E", run: () => exportPdf(true) },
+                { label: "PDF exportieren", detail: kbd("⌘E"), run: () => exportPdf(false) },
+                { label: "Aufgaben + Lösungen exportieren", detail: kbd("⌘⇧E"), run: () => exportPdf(true) },
                 "sep",
                 { label: "Ordner „out“ im Finder", run: () => revealItemInDir(project.root + "/out") },
               ],
@@ -1331,7 +1334,7 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
         <span className="grow" />
         <button
           className="item spell-item"
-          title="Rechtschreibung: Sprache wählen (⌥⌘L wechselt)"
+          title={kbd("Rechtschreibung: Sprache wählen (⌥⌘L wechselt)")}
           onClick={(e) => {
             e.stopPropagation();
             const r = (e.currentTarget as HTMLElement).getBoundingClientRect();

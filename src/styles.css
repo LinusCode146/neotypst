@@ -2653,3 +2653,8 @@ kbd.on-primary {
     transform: translateX(260%);
   }
 }
+
+/* Windows hat eine eigene Titelleiste: keine Lücke für die Ampel-Knöpfe. */
+:root[data-os="windows"] .titlebar {
+  padding-left: 10px;
+}

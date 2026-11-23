@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Icon } from "./icons";
+import { kbd, modKey } from "./platform";
 
 /** What the Rust side reads from an existing `#table(...)`. */
 export type TableModel = {
@@ -178,7 +179,7 @@ export function TableEditor({ initial, isNew, onApply, onClose }: Props) {
 
   const onKey = (e: React.KeyboardEvent<HTMLTextAreaElement>, r: number, c: number) => {
     const el = e.currentTarget;
-    if (e.key === "Enter" && e.metaKey) {
+    if (e.key === "Enter" && modKey(e)) {
       e.preventDefault();
       onApply(g);
     } else if (e.key === "Escape") {
@@ -206,7 +207,7 @@ export function TableEditor({ initial, isNew, onApply, onClose }: Props) {
     } else if (e.key === "ArrowRight" && el.selectionStart === el.value.length && c < g.cols - 1) {
       e.preventDefault();
       move(r, c + 1);
-    } else if (e.key === "Backspace" && e.metaKey && e.shiftKey) {
+    } else if (e.key === "Backspace" && modKey(e) && e.shiftKey) {
       e.preventDefault();
       delRow(r);
       setFocus([Math.max(0, r - 1), c]);
@@ -305,7 +306,7 @@ export function TableEditor({ initial, isNew, onApply, onClose }: Props) {
               {g.rows.map((row, r) => (
                 <tr key={r} className={r === 0 && g.header ? "is-header" : ""}>
                   <td className="row-tools">
-                    <button className="mini danger" title="Zeile löschen (⌘⇧⌫)" onClick={() => delRow(r)} disabled={g.rows.length <= 1}>
+                    <button className="mini danger" title={kbd("Zeile löschen (⌘⇧⌫)")} onClick={() => delRow(r)} disabled={g.rows.length <= 1}>
                       ×
                     </button>
                   </td>
@@ -344,7 +345,7 @@ export function TableEditor({ initial, isNew, onApply, onClose }: Props) {
             Abbrechen
           </button>
           <button className="btn primary" onClick={() => onApply(g)}>
-            {isNew ? "Einfügen" : "Übernehmen"} <kbd style={{ background: "transparent", color: "inherit", borderColor: "rgba(255,255,255,.35)" }}>⌘↩</kbd>
+            {isNew ? "Einfügen" : "Übernehmen"} <kbd style={{ background: "transparent", color: "inherit", borderColor: "rgba(255,255,255,.35)" }}>{kbd("⌘↩")}</kbd>
           </button>
         </div>
       </div>

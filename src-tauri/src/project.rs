@@ -240,8 +240,9 @@ fn copy_recursive(src: &Path, dst: &Path) -> Result<(), String> {
     }
 }
 
-/// Moves a file or folder to the macOS Trash. Returns where it ended up, so it
-/// can be restored.
+/// Moves a file or folder to the Trash (macOS) or Recycle Bin (Windows).
+/// Returns where it ended up, so it can be restored; empty if the system does
+/// not tell (Windows), then there is no undo.
 pub fn trash(root: &Path, rel: &str) -> Result<String, String> {
     if rel.trim_matches('/').is_empty() {
         return Err("Das Projekt selbst kann hier nicht gelöscht werden".into());
@@ -265,8 +266,9 @@ fn trash_path(path: &Path) -> Result<String, String> {
 }
 
 #[cfg(not(target_os = "macos"))]
-fn trash_path(_path: &Path) -> Result<String, String> {
-    Err("Papierkorb wird nur unter macOS unterstützt".into())
+fn trash_path(path: &Path) -> Result<String, String> {
+    trash::delete(path).map_err(|e| e.to_string())?;
+    Ok(String::new())
 }
 
 /// Moves an item back from the Trash to its old place in the project.

@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { FileEntry } from "./api";
 import { Icon } from "./icons";
+import { kbd, modKey } from "./platform";
 
 export type MenuItem = { label: string; detail?: string; danger?: boolean; run(): void } | "sep";
 
@@ -226,13 +227,13 @@ export function FileTree({ projectRoot, files, current, main, actions, request }
     items.push({ label: "Umbenennen", detail: "F2", run: () => setEditing({ mode: "rename", path: n.path }) });
     items.push({
       label: "Duplizieren",
-      detail: "⌘D",
+      detail: kbd("⌘D"),
       run: () => void actions.duplicate(n.path).then((p) => p && setSelected(p)),
     });
     items.push({ label: "Pfad kopieren", run: () => actions.copyPath(n.path) });
     items.push({ label: "Im Finder zeigen", run: () => actions.reveal(n.path) });
     items.push("sep");
-    items.push({ label: "In den Papierkorb", detail: "⌘⌫", danger: true, run: () => remove(n.path) });
+    items.push({ label: "In den Papierkorb", detail: kbd("⌘⌫"), danger: true, run: () => remove(n.path) });
     actions.showMenu(e.clientX, e.clientY, items);
   };
 
@@ -279,10 +280,10 @@ export function FileTree({ projectRoot, files, current, main, actions, request }
     } else if (e.key === "F2" && sel) {
       e.preventDefault();
       setEditing({ mode: "rename", path: sel.path });
-    } else if (e.key === "Backspace" && e.metaKey && sel) {
+    } else if (e.key === "Backspace" && modKey(e) && sel) {
       e.preventDefault();
       remove(sel.path);
-    } else if (e.key === "d" && e.metaKey && sel) {
+    } else if (e.key === "d" && modKey(e) && sel) {
       e.preventDefault();
       void actions.duplicate(sel.path).then((p) => p && setSelected(p));
     } else if (e.key === "Escape") {

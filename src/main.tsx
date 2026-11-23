@@ -3,6 +3,10 @@ import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import { applyTheme } from "./settings";
 import "./styles.css";
+import { isMac } from "./platform";
+
+// Unter Windows keine Lücke für die Ampel-Knöpfe in der Titelleiste.
+document.documentElement.dataset.os = isMac ? "mac" : "windows";
 
 applyTheme();
 

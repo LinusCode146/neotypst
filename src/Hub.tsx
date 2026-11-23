@@ -3,6 +3,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { api, type ProjectInfo, type Template } from "./api";
 import { Icon } from "./icons";
+import { kbd, modKey } from "./platform";
 
 /** Schematic page previews for the template cards. */
 export function TemplateThumb({ id }: { id: string }) {
@@ -325,11 +326,11 @@ export function Hub({ onOpen }: { onOpen(path: string): void }) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.metaKey && e.key === "n") {
+      if (modKey(e) && e.key === "n") {
         e.preventDefault();
         setDialog("arbeitsblatt");
       }
-      if (e.metaKey && e.key === "o") {
+      if (modKey(e) && e.key === "o") {
         e.preventDefault();
         openFolder();
       }
@@ -359,10 +360,10 @@ export function Hub({ onOpen }: { onOpen(path: string): void }) {
           </div>
           <div className="grow" />
           <button className="btn" onClick={openFolder}>
-            <Icon.folderOpen /> Ordner öffnen <kbd>⌘O</kbd>
+            <Icon.folderOpen /> Ordner öffnen <kbd>{kbd("⌘O")}</kbd>
           </button>
           <button className="btn primary" onClick={() => setDialog("arbeitsblatt")}>
-            <Icon.plus /> Neues Projekt <kbd style={{ background: "transparent", color: "inherit", borderColor: "rgba(255,255,255,.35)" }}>⌘N</kbd>
+            <Icon.plus /> Neues Projekt <kbd style={{ background: "transparent", color: "inherit", borderColor: "rgba(255,255,255,.35)" }}>{kbd("⌘N")}</kbd>
           </button>
         </div>
 

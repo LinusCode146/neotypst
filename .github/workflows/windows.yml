@@ -1,0 +1,96 @@
+# Baut den Windows-Installer von NeoTypst.
+#
+# - Bei einem veröffentlichten Release (scripts/release.sh) kommt
+#   NeoTypst_<version>_Windows-Setup.exe zum Release dazu, und latest.json
+#   bekommt den Eintrag für den Updater unter Windows.
+# - Von Hand (Actions → Windows → Run workflow) entsteht nur ein Test-Build
+#   als Artefakt am Lauf.
+#
+# Für Updates braucht es das Repo-Secret TAURI_SIGNING_PRIVATE_KEY
+# (Inhalt von ~/.tauri/neotypst.key), sonst entsteht der Installer ohne
+# Update-Signatur.
+name: Windows
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || github.ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - run: npm ci
+
+      - name: Installer bauen
+        run: |
+          if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            npx tauri build --bundles nsis
+          else
+            echo "::warning::Kein TAURI_SIGNING_PRIVATE_KEY: Installer ohne Update-Signatur."
+            npx tauri build --bundles nsis --config '{"bundle":{"createUpdaterArtifacts":false}}'
+          fi
+
+      - name: Installer benennen
+        id: exe
+        run: |
+          VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          SRC=$(ls src-tauri/target/release/bundle/nsis/*-setup.exe | head -1)
+          NAME="NeoTypst_${VERSION}_Windows-Setup.exe"
+          mkdir -p out
+          cp "$SRC" "out/$NAME"
+          [ -f "$SRC.sig" ] && cp "$SRC.sig" "out/$NAME.sig"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NeoTypst-Windows
+          path: out/
+
+      - name: Zum Release hinzufügen
+        if: github.event_name == 'release'
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          NAME="${{ steps.exe.outputs.name }}"
+          gh release upload "$TAG" "out/$NAME" --clobber
+
+          if [ ! -f "out/$NAME.sig" ]; then
+            echo "::warning::Keine Signatur, latest.json bleibt ohne Windows-Eintrag."
+            exit 0
+          fi
+          gh release download "$TAG" -p latest.json -D manifest --clobber
+          node -e '
+            const fs = require("fs");
+            const [file, url, sigFile] = process.argv.slice(1);
+            const m = JSON.parse(fs.readFileSync(file, "utf8"));
+            m.platforms["windows-x86_64"] = { signature: fs.readFileSync(sigFile, "utf8"), url };
+            fs.writeFileSync(file, JSON.stringify(m, null, 2));
+          ' manifest/latest.json \
+            "https://github.com/${{ github.repository }}/releases/download/$TAG/$NAME" \
+            "out/$NAME.sig"
+          gh release upload "$TAG" manifest/latest.json --clobber
