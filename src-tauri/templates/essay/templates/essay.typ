@@ -12,9 +12,10 @@
   lehrkraft: "",
   datum: "",
   untertitel: none,
+  profil: "klassisch",
   body,
 ) = {
-  show: stil
+  show: stil.with(profil: profil)
   set document(title: fragestellung, author: name)
 
   // Ohne Fettdruck: Überschriften unterscheiden sich nur durch die Größe,

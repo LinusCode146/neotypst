@@ -456,6 +456,20 @@ Siehe @a und @b.
 ]
 #context assert.eq(_akzent.get().last(), black)
 #context assert.eq(_kasten.get().last(), luma(244))
+
+// Profil „akademisch“: kein Kasten, e aufrecht, e_1 bleibt Name
+#assert(_neu($e^x$.body) == none)
+#assert(_neu($e^x$.body, iso: true) != none)
+#assert(_neu($e$.body, iso: true) != none)
+#[
+  #show: stil.with(profil: "akademisch")
+  #context assert(_akademisch())
+  #context assert.eq(_kasten.get().last(), none)
+  #aufgabe(punkte: 2)[+ a + b]
+  #teil[$x = 1$]
+  #figure(table(columns: 2, [a], [b]), caption: [T])
+]
+#context assert(not _akademisch())
 "#;
         std::fs::write(dir.join("main.typ"), main).unwrap();
         let mut engine = Engine::new();

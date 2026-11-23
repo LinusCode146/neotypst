@@ -3,6 +3,7 @@
 //   #import "@local/stil:0.1.0": *
 //   #show: stil                         schwarz, 12 pt
 //   #show: stil.with(akzent: rgb("#2b50c8"), groesse: 11pt)
+//   #show: stil.with(profil: "akademisch")   nach Uni- und Satznormen
 //
 // Regeln und Beispiele: STIL.md im selben Ordner.
 
@@ -13,6 +14,11 @@
 // So färbt ein Kapitel mit eigener Akzentfarbe nichts, was danach kommt.
 #let _akzent = state("stil-akzent", (black,))
 #let _kasten = state("stil-kasten", (luma(244),))
+// "klassisch": grauer Aufgabenkasten, 12 pt, Flattersatz.
+// "akademisch": wie Übungsblätter, Wettbewerbslösungen und Arbeiten an der Uni
+// (Blocksatz, 11 pt, Satzspiegel nach KOMA-Script, Tabellen ohne Gitter).
+#let _profil = state("stil-profil", ("klassisch",))
+#let _akademisch() = _profil.get().last() == "akademisch"
 #let _aufgabe = counter("stil-aufgabe")
 #let _teil = counter("stil-teil")
 
@@ -155,9 +161,11 @@
 /// Bearbeitet einen Formelteil. Gibt `none` zurück, wenn sich nichts ändert:
 /// So muss nichts mit dem Original verglichen werden, und unveränderte Teile
 /// werden nicht neu gebaut.
-#let _neu(body) = {
+#let _neu(body, iso: false) = {
   if type(body) != content { return none }
   let f = body.func()
+  // Profil „akademisch“: die Eulersche Zahl e aufrecht (DIN 1338, ISO 80000-2).
+  if iso and f == _symbol and body.text == "e" { return math.upright(body) }
   if f == _seq {
     let ch = body.children
     let neu = none
@@ -188,7 +196,7 @@
           weiter = k + 1
         }
       } else {
-        let n = _neu(c)
+        let n = _neu(c, iso: iso)
         if n != none { ersatz = (n,) }
       }
       if ersatz != none and neu == none { neu = ch.slice(0, i) }
@@ -199,7 +207,7 @@
   }
   // In verschachtelte Formelteile hineinschauen.
   if f == math.frac {
-    let (n, d) = (_neu(body.num), _neu(body.denom))
+    let (n, d) = (_neu(body.num, iso: iso), _neu(body.denom, iso: iso))
     if n == none and d == none { return none }
     return math.frac(if n == none { body.num } else { n }, if d == none { body.denom } else { d })
   }
@@ -207,21 +215,25 @@
     let felder = body.fields()
     let anders = false
     for (k, v) in felder {
-      let w = _neu(v)
+      let w = _neu(v, iso: iso)
       if w != none { felder.insert(k, w); anders = true }
+    }
+    // e_1 bleibt ein Name (Einheitsvektor), e^x wird aufrecht.
+    if iso and "base" in felder and felder.at("t", default: none) == none and felder.at("b", default: none) != none and _ist-symbol(body.base) and body.base.text == "e" {
+      felder.insert("base", body.base)
     }
     if not anders { return none }
     let base = felder.remove("base")
     return math.attach(base, ..felder)
   }
   if f in (math.lr, math.underline, math.overline) {
-    let b = _neu(body.body)
+    let b = _neu(body.body, iso: iso)
     return if b == none { none } else { f(b) }
   }
   if f == math.root {
     let index = body.at("index", default: none)
-    let i = _neu(index)
-    let r = _neu(body.radicand)
+    let i = _neu(index, iso: iso)
+    let r = _neu(body.radicand, iso: iso)
     if i == none and r == none { return none }
     return math.root(if i == none { index } else { i }, if r == none { body.radicand } else { r })
   }
@@ -239,10 +251,10 @@
 #let _fertig = metadata("stil-fertig")
 
 /// Die Formel-Regel aus `stil`: Dezimalkomma und Einheiten.
-#let _formel(it) = {
+#let _formel(it, iso: false) = {
   let b = it.body
   if b.func() == _seq and b.children.len() > 0 and b.children.first() == _fertig { return it }
-  let neu = _neu(b)
+  let neu = _neu(b, iso: iso)
   if neu == none { return it }
   // Die neu gebaute Formel zählt selbst mit; die ursprüngliche hat die Nummer
   // schon vergeben. Sonst wären nummerierte Formeln (2), (4), …
@@ -279,6 +291,19 @@
   context {
     let ak = _akzent.get().last()
     let nummer = if nr == auto { _aufgabe.display() } else { nr }
+    if _akademisch() {
+      // Wie auf Uni-Übungsblättern: Kopf als Zeile, die Stellung zwischen
+      // zwei feinen Linien statt auf grauem Grund (druckt und kopiert sauber).
+      block(width: 100%, above: 1.9em, below: 1em, breakable: true)[
+        #set enum(numbering: "(a)")
+        #block(below: 0.55em, sticky: true, grid(
+          columns: (1fr, auto),
+          text(fill: ak, weight: "bold")[Aufgabe #nummer#if titel != none [#h(0.7em)#text(fill: black, weight: "regular", titel)]],
+          if punkte != none [(#punkte #if punkte == 1 [Punkt] else [Punkte])],
+        ))
+        #block(width: 100%, inset: (y: 0.6em), stroke: (top: 0.4pt, bottom: 0.4pt), body)
+      ]
+    } else {
     block(
       width: 100%,
       fill: _kasten.get().last(),
@@ -299,6 +324,7 @@
       ))
       #body
     ]
+    }
   }
   _teil.update(0)
 }
@@ -323,11 +349,14 @@
   context {
     let ak = _akzent.get().last()
     let b = if eigen == none { numbering("a", _teil.get().first()) } else { eigen }
+    let ak-profil = _akademisch()
+    // Akademisch: (a) in normaler Schrift, wie in LaTeX-Aufzählungen.
+    let marke = if ak-profil { text(fill: ak)[(#b)] } else { text(fill: ak, weight: "bold")[#b)] }
     show math.equation.where(block: true): set block(above: 0.4em, below: 0.4em)
     block(above: 1em, below: 1em, grid(
-      columns: (1.7em, 1fr),
+      columns: (if ak-profil { 2.1em } else { 1.7em }, 1fr),
       align: if nur-formel { horizon } else { top },
-      text(fill: ak, weight: "bold")[#b)],
+      marke,
       body,
     ))
   }
@@ -346,36 +375,52 @@
 
 /// Alle Grundeinstellungen auf einmal: `#show: stil.with(…)`.
 ///
+/// - profil: "klassisch" (Standard) oder "akademisch" (siehe STIL.md, Abschnitt 6)
 /// - akzent: Farbe für Aufgabenköpfe und Teilaufgaben
-/// - kasten: Hintergrund der Aufgabenstellung
+/// - kasten: Hintergrund der Aufgabenstellung (im Profil „akademisch“ keiner)
 /// - schrift: Textschrift, Standard ist die LaTeX-Schrift; z. B. "Charter" oder "Libron"
-/// - groesse: Grundgröße des Textes
+/// - groesse: Grundgröße des Textes (klassisch 12 pt, akademisch 11 pt)
 /// - formeln: Schrift für Formeln
+/// - rand: Seitenränder (akademisch: Satzspiegel für etwa 75 Zeichen pro Zeile)
 #let stil(
+  profil: "klassisch",
   akzent: black,
-  kasten: luma(244),
+  kasten: auto,
   schrift: "New Computer Modern",
-  groesse: 12pt,
+  groesse: auto,
   formeln: "New Computer Modern Math",
-  rand: (x: 2.2cm, y: 2cm),
+  rand: auto,
   body,
 ) = {
+  assert(profil in ("klassisch", "akademisch"), message: "stil: profil ist \"klassisch\" oder \"akademisch\"")
+  let ak = profil == "akademisch"
+  let kasten = if kasten != auto { kasten } else if ak { none } else { luma(244) }
+  let groesse = if groesse != auto { groesse } else if ak { 11pt } else { 12pt }
+  let rand = if rand != auto { rand } else if ak { (x: 3.2cm, top: 2.7cm, bottom: 3.2cm) } else { (x: 2.2cm, y: 2cm) }
+
+  _profil.update(s => s + (profil,))
   _akzent.update(s => s + (akzent,))
   _kasten.update(s => s + (kasten,))
   let faktor = _skalierung.at(schrift, default: 1)
 
-  set page(paper: "a4", margin: rand)
+  set page(paper: "a4", margin: rand, numbering: if ak { "1" } else { none })
   set text(
     font: (schrift, "New Computer Modern"),
     size: groesse * faktor,
     lang: "de",
     region: "DE",
   )
-  set par(justify: false, leading: 0.8em, spacing: 1.3em)
+  // Akademisch: Blocksatz mit Silbentrennung, Zeilenabstand um 130 % der
+  // Schriftgröße, Absätze durch halbe Leerzeile getrennt (KOMA parskip=half).
+  set par(
+    justify: ak,
+    leading: if ak { 0.62em } else { 0.8em },
+    spacing: if ak { 1.05em } else { 1.3em },
+  )
 
   // Formeln: Computer Modern, Größe passend zur Textschrift.
   show math.equation: set text(font: formeln, size: groesse)
-  show math.equation: _formel
+  show math.equation: _formel.with(iso: ak)
   set math.equation(numbering: none)
   show math.equation.where(block: true): set block(above: 1em, below: 1em)
 
@@ -384,28 +429,59 @@
   // Die fette Computer Modern ist breit gebaut: Überschriften deshalb nur
   // wenig größer als der Text und mit etwas engeren Buchstaben.
   // Feste Größen (bei 12 pt: 15 / 13 / 12 pt), damit sich nichts aufaddiert.
+  // Akademisch wie LaTeX bei 11 pt: 14,4 / 12 / 11 pt.
   show heading: set text(weight: "bold", tracking: -0.015em)
-  show heading.where(level: 1): set text(size: groesse * faktor * 1.25)
-  show heading.where(level: 2): set text(size: groesse * faktor * 1.085)
+  show heading.where(level: 1): set text(size: groesse * faktor * if ak { 1.31 } else { 1.25 })
+  show heading.where(level: 2): set text(size: groesse * faktor * if ak { 1.09 } else { 1.085 })
   show heading.where(level: 3): set text(size: groesse * faktor)
-  show heading: set block(above: 1.6em, below: 0.8em)
+  show heading: set block(above: if ak { 1.9em } else { 1.6em }, below: 0.8em)
+  show heading: set par(justify: false)
 
   // Code
   // Code in fester Größe relativ zur Grundgröße: Typst verkleinert raw
   // ohnehin auf 0,8 em, und neben Libron wirkte Code sonst zu klein.
-  show raw: set text(font: ("Menlo", "DejaVu Sans Mono"), size: groesse * 0.8)
-  show raw.where(block: true): block.with(
-    width: 100%, fill: luma(246), inset: 8pt, radius: 3pt,
-  )
+  show raw: set text(font: ("Menlo", "DejaVu Sans Mono"), size: groesse * if ak { 0.82 } else { 0.8 })
+  show raw.where(block: true): set par(justify: false)
+  show raw.where(block: true): if ak {
+    // Wie LaTeX-listings mit frame=lines: feine Linien statt Fläche.
+    block.with(width: 100%, inset: (x: 0pt, y: 6pt), stroke: (top: 0.4pt, bottom: 0.4pt))
+  } else {
+    block.with(width: 100%, fill: luma(246), inset: 8pt, radius: 3pt)
+  }
 
   // Abbildungen und Tabellen
   set figure(gap: 0.7em)
   show figure.caption: set text(size: 0.9em)
-  set table(stroke: 0.5pt + luma(170), inset: (x: 7pt, y: 5pt))
   set list(indent: 0.4em, body-indent: 0.6em)
   set enum(indent: 0.4em, body-indent: 0.6em)
 
+  show: it => if ak {
+    // Tabellen im Buchsatz-Stil (booktabs): keine senkrechten Linien,
+    // kräftige Linie oben und unten, feine unter dem Kopf.
+    // Tabellenunterschriften stehen über der Tabelle.
+    set table(
+      stroke: (_, y) => if y == 0 { (top: 0.8pt, bottom: 0.45pt) },
+      inset: (x: 6pt, y: 4.5pt),
+    )
+    show table: t => box(stroke: (bottom: 0.8pt), t)
+    show figure.where(kind: table): set figure.caption(position: top)
+    // Abbildung 1: … mit fettem Etikett, wie in Fachartikeln.
+    show figure.caption: c => if c.numbering == none { c } else [#text(weight: "bold")[#c.supplement #c.counter.display(c.numbering):] #c.body]
+    // Längere Zitate eingerückt, ohne Anführungszeichen, etwas kleiner.
+    show quote.where(block: true): q => block(above: 1.1em, below: 1.1em, inset: (x: 1.5em), {
+      set text(size: 0.95em)
+      q.body
+      if q.attribution != none { linebreak(); h(1fr); q.attribution }
+    })
+    show footnote.entry: set text(size: 0.85em)
+    it
+  } else {
+    set table(stroke: 0.5pt + luma(170), inset: (x: 7pt, y: 5pt))
+    it
+  }
+
   body
+  _profil.update(s => s.slice(0, -1))
   _akzent.update(s => s.slice(0, -1))
   _kasten.update(s => s.slice(0, -1))
 }

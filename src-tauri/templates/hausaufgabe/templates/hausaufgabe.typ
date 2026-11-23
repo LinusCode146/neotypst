@@ -5,8 +5,8 @@
 
 #let grau = luma(110)
 
-#let hausaufgabe(titel: "", kurs: "", name: "", datum: "", akzent: black, body) = {
-  show: stil.with(akzent: akzent)
+#let hausaufgabe(titel: "", kurs: "", name: "", datum: "", akzent: black, profil: "klassisch", body) = {
+  show: stil.with(profil: profil, akzent: akzent)
   set document(title: titel, author: name)
   set page(
     header: context if counter(page).get().first() > 1 {

@@ -18,9 +18,10 @@
   datum: "",
   namensfeld: true,
   akzent: black,
+  profil: "klassisch",
   body,
 ) = {
-  show: stil.with(akzent: akzent, rand: (x: 2cm, top: 2.2cm, bottom: 2cm))
+  show: stil.with(profil: profil, akzent: akzent, rand: if profil == "klassisch" { (x: 2cm, top: 2.2cm, bottom: 2cm) } else { auto })
   set document(title: titel)
   set page(footer: context {
     set text(9pt, fill: grau)

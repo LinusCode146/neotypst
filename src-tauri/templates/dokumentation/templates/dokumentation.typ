@@ -11,9 +11,10 @@
   datum: "",
   inhaltsverzeichnis: true,
   akzent: black,
+  profil: "klassisch",
   body,
 ) = {
-  show: stil.with(akzent: akzent, rand: (x: 2.5cm, y: 2.5cm))
+  show: stil.with(profil: profil, akzent: akzent, rand: if profil == "klassisch" { (x: 2.5cm, y: 2.5cm) } else { auto })
   set document(title: titel, author: autoren)
   set heading(numbering: "1.1")
 
@@ -70,6 +71,8 @@
   inset: (x: 11pt, y: 9pt),
   radius: 2pt,
   fill: _kasten.get().last(),
+  // Ohne Kasten (Profil „akademisch“) ein feiner Rahmen.
+  stroke: if _kasten.get().last() == none { 0.5pt + luma(160) },
   above: 1.2em,
   below: 1.2em,
 )[

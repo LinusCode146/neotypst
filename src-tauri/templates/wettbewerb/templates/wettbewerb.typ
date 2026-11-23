@@ -5,8 +5,8 @@
 
 #let grau = luma(110)
 
-#let wettbewerb(wettbewerb: "", runde: "", name: "", teilnehmernummer: "", datum: "", akzent: black, body) = {
-  show: stil.with(akzent: akzent, rand: (x: 2.3cm, y: 2.3cm))
+#let wettbewerb(wettbewerb: "", runde: "", name: "", teilnehmernummer: "", datum: "", akzent: black, profil: "klassisch", body) = {
+  show: stil.with(profil: profil, akzent: akzent, rand: if profil == "klassisch" { (x: 2.3cm, y: 2.3cm) } else { auto })
   set document(title: wettbewerb + " " + runde, author: name)
   set page(
     header: {
@@ -27,14 +27,19 @@
   pagebreak(weak: true)
   text(16pt, weight: "bold")[Aufgabe #nummer#if titel != none [#h(0.6em)#text(weight: "regular", titel)]]
   v(0.2em)
-  context block(
-    width: 100%,
-    fill: _kasten.get().last(),
-    inset: (x: 11pt, y: 9pt),
-    radius: 2pt,
-    below: 1em,
-    stellung,
-  )
+  context if _akademisch() {
+    // Wie in den Lösungsheften: Stellung zwischen zwei feinen Linien.
+    block(width: 100%, inset: (y: 0.6em), stroke: (top: 0.4pt, bottom: 0.4pt), below: 1em, stellung)
+  } else {
+    block(
+      width: 100%,
+      fill: _kasten.get().last(),
+      inset: (x: 11pt, y: 9pt),
+      radius: 2pt,
+      below: 1em,
+      stellung,
+    )
+  }
 }
 
 #let _box(name, body, qed: false) = block(width: 100%, above: 1.2em, {

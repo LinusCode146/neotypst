@@ -124,3 +124,44 @@ Regeln:
 - Code in ` ```python … ``` ` erscheint grau hinterlegt in Menlo.
 - Tabellen mit dünnen grauen Linien; Kopfzeile über `table.header[*…*]`.
 - Abbildungen mit `#figure(…, caption: [...])`, wenn im Text auf sie verwiesen wird. Sonst reicht `#image(…)`.
+
+## 6 Profil „akademisch“
+
+Eine Alternative zum klassischen Stil. Grundlage sind Übungsblätter und Lösungen von Universitäten, die Lösungshefte von Bundeswettbewerb Mathematik und Bundeswettbewerb Informatik, Formatvorgaben für wissenschaftliche Arbeiten, die Normen DIN 1338 und ISO 80000-2 sowie KOMA-Script und Bringhurst.
+
+```typst
+#show: stil.with(profil: "akademisch")
+#show: hausaufgabe.with(profil: "akademisch", …)   // alle Vorlagen kennen profil
+```
+
+Alle Bausteine bleiben gleich: `aufgabe`, `teil`, `erg`, `antwort`, ausgerichtete Rechnungen, Dezimalkomma und Einheiten. Es ändert sich nur das Aussehen.
+
+| | klassisch | akademisch | Grund |
+|---|---|---|---|
+| Schriftgröße | 12 pt | 11 pt | LaTeX-Standard für Skripte und Übungsblätter, Fließtext 10–12 pt |
+| Satzspiegel | Rand 2,2 / 2 cm | Rand 3,2 cm seitlich, 2,7 / 3,2 cm oben/unten | KOMA-Script DIV 10 bei 11 pt, kürzere Zeilen |
+| Satz | Flattersatz | Blocksatz mit Silbentrennung | Standard in Uni-Vorgaben und Lösungsheften |
+| Zeilenabstand | etwa 150 % | etwa 130 % | Butterick: 120–145 %; 150 % ist eine Schreibmaschinen-Konvention |
+| Absätze | 1,3 em Abstand | halbe Leerzeile | KOMA `parskip=half`, in Deutschland üblich |
+| Aufgabe | grauer Kasten, Kopf fett | Kopfzeile, Stellung zwischen zwei feinen Linien, „(4 Punkte)“ | Grauflächen drucken und kopieren schlecht; Uni-Blätter und Lösungshefte trennen mit Linien |
+| Teilaufgabe | **a)** fett | (a) normal | LaTeX-Aufzählung, wie auf Übungsblättern |
+| Eulersche Zahl | kursiv | aufrecht: e, eˣ | DIN 1338 Tab. 1, ISO 80000-2 (Konstanten mit fester Bedeutung) |
+| Tabellen | Gitter | Linien nur oben, unter dem Kopf, unten; Unterschrift oben | Buchsatz (booktabs), Tabellenunterschrift über der Tabelle |
+| Abbildungsunterschrift | Tabelle 1: … | **Tabelle 1:** … | Fachartikel |
+| Quelltext | grau hinterlegt | zwischen zwei feinen Linien | LaTeX `listings` mit `frame=lines` |
+| Zitate | Typst-Standard | eingerückt, kleiner, ohne Anführungszeichen | Chicago ab fünf Zeilen, deutsche Uni-Vorgaben oft ab drei |
+| Seitenzahl | nur in Vorlagen | unten mittig | LaTeX `plain` |
+
+Zusätzliche Schreibregeln für dieses Profil:
+
+- Differential mit `dif`: `integral_0^1 f(x) dif x` setzt d aufrecht mit passendem Abstand (ISO 80000-2).
+- `e_1` bleibt kursiv, weil es ein Name ist (Einheitsvektor). Nur e allein und eˣ werden aufrecht.
+- Beweise wie im Lösungsheft gliedern: Voraussetzung, Behauptung, Beweis, jeweils in ganzen Sätzen.
+- Dokumentationen für den Bundeswettbewerb Informatik: Abschnitte Lösungsidee, Umsetzung, Beispiele, Quellcode. Vom Quellcode nur die wichtigen Teile, etwa 2–3 Seiten.
+- Abschnittsnummern nach DIN 1421 ohne Schlusspunkt (1, 1.1, 1.2). Die Vorlage Dokumentation macht das schon. Für Übungsblätter bleiben Überschriften ohne Nummer.
+
+Bewusst nicht übernommen:
+
+- 1,5-facher Zeilenabstand und Times 12 pt aus Uni-Formatvorgaben. Diese Werte stammen aus der Zeit von Word und Schreibmaschine. Bei gesetztem Text mit Formeln wirken sie lose.
+- Ein eigenes „Lösung:“ unter jeder Aufgabe. Viele Musterlösungen schreiben es hin, hier trennt schon die Linie unter der Aufgabenstellung.
+- Doppelte Unterstreichung ersetzen. An der Uni ist sie unüblich, sie bleibt aber, weil `erg` ein Baustein dieses Stils ist.
