@@ -1,11 +1,22 @@
 // @vitest-environment jsdom
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { convertPipeTable, matrixSnippet, tableSnippet, wrapSelection } from "../editor/snippets";
 
+// jsdom misst kein Layout. CodeMirror fragt nach dem Scrollen Rechtecke ab,
+// teils erst im nächsten Frame; ohne diese Attrappen wirft das je nach Timing.
+const leer = { x: 0, y: 0, width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0, toJSON: () => ({}) } as DOMRect;
+Range.prototype.getClientRects = () => ({ length: 0, item: () => null, [Symbol.iterator]: [][Symbol.iterator] }) as unknown as DOMRectList;
+Range.prototype.getBoundingClientRect = () => leer;
+
+const offen: EditorView[] = [];
+afterEach(() => offen.splice(0).forEach((v) => v.destroy()));
+
 function view(doc: string, from: number, to = from) {
-  return new EditorView({ state: EditorState.create({ doc, selection: { anchor: from, head: to } }) });
+  const v = new EditorView({ state: EditorState.create({ doc, selection: { anchor: from, head: to } }) });
+  offen.push(v);
+  return v;
 }
 
 describe("Snippet-Texte", () => {
