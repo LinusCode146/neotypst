@@ -16,6 +16,12 @@ import { useSpell } from "./workspace/useSpell";
 import { useCompile } from "./workspace/useCompile";
 import { useEditorTools } from "./workspace/useEditorTools";
 import type { Menu, Toast } from "./workspace/types";
+import { Titlebar } from "./workspace/Titlebar";
+import { StatusBar } from "./workspace/StatusBar";
+import { Outline } from "./workspace/Outline";
+import { EditorNotices } from "./workspace/EditorNotices";
+import { SaveTemplateDialog } from "./workspace/SaveTemplateDialog";
+import { PopupMenu, ToastView } from "./workspace/Overlays";
 import { Preview, type Marker, type PreviewHandle } from "./Preview";
 import { getSettings, setSettings, useSettings } from "./settings";
 
@@ -55,7 +61,7 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
   const [symbolsOpen, setSymbolsOpen] = useState(false);
   const [graphicsOpen, setGraphicsOpen] = useState(false);
   const [litOpen, setLitOpen] = useState(false);
-  const [saveTpl, setSaveTpl] = useState<{ name: string; description: string; error?: string } | null>(null);
+  const [saveTpl, setSaveTpl] = useState<{ name: string } | null>(null);
 
   const [searchOpen, setSearchOpen] = useState<{ n: number; initial: string } | null>(null);
   const openSearch = useCallback(() => {
@@ -533,7 +539,7 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
       },
       openTableEditor: () => void openTableEditor(),
       openMatrixEditor: () => void openMatrixEditor(),
-      saveAsTemplate: () => setSaveTpl({ name: project.name, description: "" }),
+      saveAsTemplate: () => setSaveTpl({ name: project.name }),
       openSearch,
       formatDocument: () => void formatDocument(),
       requestTree,
@@ -589,10 +595,8 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
 
   // ---------- Render ----------
 
-  const errors = diags.filter((d) => d.severity === "error");
-  const warnings = diags.filter((d) => d.severity === "warning");
+  const firstError = diags.find((d) => d.severity === "error");
   const outline = useMemo(() => outlineOf(text), [text]);
-  const firstError = errors[0];
 
 
   const treeActions: TreeActions = useMemo(
@@ -665,76 +669,36 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
 
   return (
     <div className="workspace" onClick={() => menu && setMenu(null)}>
-      <div className="titlebar" data-tauri-drag-region>
-        <button className="icon-btn" title="Projektübersicht" onClick={onClose}>
-          <Icon.home />
-        </button>
-        <button className={"icon-btn" + (settings.sidebar ? " on" : "")} title={title("sidebar", "Seitenleiste")} onClick={() => setSettings({ sidebar: !settings.sidebar })}>
-          <Icon.sidebar />
-        </button>
-        <div className="crumbs" data-tauri-drag-region>
-          <span>{project.name}</span>
-          {current && (
-            <>
-              <span className="sep">/</span>
-              <span className="file">{current}</span>
-            </>
-          )}
-          {dirty && <span className="dirty" title="Ungespeicherte Änderungen" />}
-        </div>
-        <div className="spacer" data-tauri-drag-region />
-        <button className="icon-btn" title={title("literature", "Literatur & Zitate")} onClick={() => setLitOpen(true)}>
-          <Icon.book />
-        </button>
-        <button className="icon-btn" title={title("graphics", "Grafik einfügen")} onClick={() => setGraphicsOpen(true)}>
-          <Icon.chart />
-        </button>
-        <button className="icon-btn" title={title("symbols", "Symbole")} onClick={() => setSymbolsOpen(true)}>
-          <Icon.math />
-        </button>
-        <button className="icon-btn" title={title("grid-editor", "Tabellen-Editor, in Formeln Matrix-Editor")} onClick={openGridEditor}>
-          <Icon.table />
-        </button>
-        <button className="btn ghost" onClick={() => setPalette("all")} title="Befehle, Bausteine, Dateien">
-          <Icon.search /> <span style={{ color: "var(--muted)" }}>Befehle</span> <kbd>{keyLabel("mod+k")}</kbd>
-        </button>
-        <div className="divider" />
-        <button className={"toggle" + (solutions ? " on" : "")} onClick={toggleSolutions} title={title("solutions", "Lösungen ein-/ausblenden")}>
-          <span className="knob" /> Lösungen
-        </button>
-        <div className="divider" />
-        <div className="group">
-          <button className="icon-btn" title={title("zoom-out", "Verkleinern")} onClick={() => zoom(settings.zoom / 1.15)}>
-            <Icon.zoomOut />
-          </button>
-          <button className="btn ghost zoom-label" style={{ padding: 0 }} title={title("zoom-fit", "An Breite anpassen")} onClick={() => zoom(1)}>
-            {Math.round(settings.zoom * 100)}%
-          </button>
-          <button className="icon-btn" title={title("zoom-in", "Vergrößern")} onClick={() => zoom(settings.zoom * 1.15)}>
-            <Icon.zoomIn />
-          </button>
-        </div>
-        <div className="divider" />
-        <button
-          className="btn primary"
-          onClick={(e) => {
-            e.stopPropagation();
-            const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-            setMenu({
-              x: r.right - 240,
-              y: r.bottom + 6,
-              items: [
-                { label: "PDF exportieren", detail: keyLabel("mod+e"), run: () => exportPdf(false) },
-                { label: "Aufgaben + Lösungen exportieren", detail: keyLabel("mod+shift+e"), run: () => exportPdf(true) },
-                "sep",
-                { label: "Ordner „out“ im Finder", run: () => revealItemInDir(project.root + "/out") },
-              ],
-            });
-          }}
-        >
-          <Icon.export /> Export <Icon.chevronDown />
-        </button>
-      </div>
+      <Titlebar
+        projectName={project.name}
+        current={current}
+        dirty={dirty}
+        sidebar={settings.sidebar}
+        solutions={solutions}
+        zoom={settings.zoom}
+        title={title}
+        onHome={onClose}
+        onToggleSidebar={() => setSettings({ sidebar: !settings.sidebar })}
+        onLiterature={() => setLitOpen(true)}
+        onGraphics={() => setGraphicsOpen(true)}
+        onSymbols={() => setSymbolsOpen(true)}
+        onGrid={() => void openGridEditor()}
+        onPalette={() => setPalette("all")}
+        onToggleSolutions={() => void toggleSolutions()}
+        onZoom={zoom}
+        onExportMenu={(r) =>
+          setMenu({
+            x: r.right - 240,
+            y: r.bottom + 6,
+            items: [
+              { label: "PDF exportieren", detail: keyLabel("mod+e"), run: () => exportPdf(false) },
+              { label: "Aufgaben + Lösungen exportieren", detail: keyLabel("mod+shift+e"), run: () => exportPdf(true) },
+              "sep",
+              { label: "Ordner „out“ im Finder", run: () => revealItemInDir(project.root + "/out") },
+            ],
+          })
+        }
+      />
 
       <div className="panes" ref={panes}>
         {settings.sidebar && (
@@ -761,62 +725,20 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
             ) : (
               <FileTree projectRoot={project.root} files={files} current={current} main={main} actions={treeActions} request={treeRequest} />
             )}
-            {!searchOpen && outline.length > 0 && (
-              <div className="outline">
-                <div className="sidebar-head" style={{ paddingLeft: 8 }}>
-                  <span>Gliederung</span>
-                </div>
-                {outline.map((h, i) => (
-                  <div
-                    key={i}
-                    className="outline-row"
-                    style={{ paddingLeft: 8 + (h.level - 1) * 12, fontWeight: h.level === 1 ? 500 : 400 }}
-                    onClick={() => editor.current?.revealLine(h.line)}
-                  >
-                    {h.title}
-                  </div>
-                ))}
-              </div>
-            )}
+            {!searchOpen && <Outline items={outline} onReveal={(line) => editor.current?.revealLine(line)} />}
           </aside>
         )}
 
         <section className="editor-pane" style={{ flexBasis: `${split * 100}%` }}>
-          {(() => {
-            const veraltet = stil.filter((d) => d.status === "veraltet");
-            const kaputt = stil.filter((d) => d.status !== "aktuell" && diags.some((g) => g.severity === "error" && g.file === d.path));
-            if (stilLater || (!veraltet.length && !kaputt.length)) return null;
-            return (
-              <div className="conflict-bar stil-bar" role="status">
-                <Icon.bolt />
-                <span className="conflict-text">
-                  {kaputt.length
-                    ? <><b>{kaputt[0].path}</b> hat Fehler und weicht von der Fassung in NeoTypst ab.</>
-                    : <>Der Stil in diesem Projekt ist älter als in NeoTypst ({veraltet.map((d) => d.path.replace("templates/", "")).join(", ")}).</>}
-                </span>
-                <button className="btn" onClick={() => setStilLater(true)}>
-                  Später
-                </button>
-                <button className="btn primary" onClick={() => setStilOpen(true)}>
-                  Ansehen …
-                </button>
-              </div>
-            );
-          })()}
-          {conflict && conflict === current && (
-            <div className="conflict-bar" role="alert">
-              <Icon.alert />
-              <span className="conflict-text">
-                <b>{conflict}</b> wurde außerhalb von NeoTypst geändert. Deine Änderungen hier sind noch nicht gespeichert.
-              </span>
-              <button className="btn" onClick={() => void resolveConflict("disk")}>
-                Neu laden
-              </button>
-              <button className="btn primary" onClick={() => void resolveConflict("mine")}>
-                Meine Version behalten
-              </button>
-            </div>
-          )}
+          <EditorNotices
+            stil={stil}
+            diags={diags}
+            stilLater={stilLater}
+            onStilLater={() => setStilLater(true)}
+            onStilOpen={() => setStilOpen(true)}
+            conflict={conflict && conflict === current ? conflict : null}
+            onResolve={(keep) => void resolveConflict(keep)}
+          />
           <Editor
             ref={editor}
             onChange={onChange}
@@ -872,53 +794,29 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
         </div>
       </div>
 
-      <footer className="statusbar">
-        <button className="item" onClick={() => setShowProblems((s) => !s)} title="Probleme anzeigen">
-          {errors.length === 0 && warnings.length === 0 ? (
-            <span className="okc">✓ Keine Fehler</span>
-          ) : (
-            <>
-              {errors.length > 0 && <span className="err">● {errors.length} Fehler</span>}
-              {warnings.length > 0 && <span className="warn">▲ {warnings.length} Warnung{warnings.length > 1 ? "en" : ""}</span>}
-            </>
-          )}
-        </button>
-        <span className="item">{compiling ? "kompiliert …" : millis != null ? `${millis} ms` : ""}</span>
-        <span className="item">
-          {pages.length} Seite{pages.length === 1 ? "" : "n"}
-        </span>
-        <span className="grow" />
-        <button
-          className="item spell-item"
-          title={`Rechtschreibung: Sprache wählen (${keyLabel("mod+alt+l")} wechselt)`}
-          onClick={(e) => {
-            e.stopPropagation();
-            const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-            setMenu({
-              x: r.left,
-              y: r.top - 8 - 4 * 28 - 10,
-              items: SPELL_MODES.map((m) => ({
-                label: (settings.spell === m ? "✓ " : "   ") + spellLabel(m),
-                detail: m === "auto" ? "pro Absatz erkannt" : undefined,
-                run: () => setSettings({ spell: m }),
-              })),
-            });
-          }}
-        >
-          <span className="abc">ABC</span>
-          {settings.spell === "off"
-            ? "Aus"
-            : settings.spell === "auto"
-              ? `Auto${spellInfo.dominant ? " · " + spellInfo.dominant.toUpperCase() : ""}`
-              : settings.spell.toUpperCase()}
-          {settings.spell !== "off" && spellInfo.count > 0 && <span className="spell-count">{spellInfo.count}</span>}
-        </button>
-        {vimMode && <span className="item vim">{vimMode.toUpperCase()}</span>}
-        <span className="item">
-          Z {cursor.line}, S {cursor.col}
-        </span>
-        <span className="item">{dirty ? "Ungespeichert" : "Gespeichert"}</span>
-      </footer>
+      <StatusBar
+        diags={diags}
+        compiling={compiling}
+        millis={millis}
+        pageCount={pages.length}
+        spell={settings.spell}
+        spellInfo={spellInfo}
+        vimMode={vimMode}
+        cursor={cursor}
+        dirty={dirty}
+        onToggleProblems={() => setShowProblems((s) => !s)}
+        onSpellMenu={(r) =>
+          setMenu({
+            x: r.left,
+            y: r.top - 8 - 4 * 28 - 10,
+            items: SPELL_MODES.map((m) => ({
+              label: (settings.spell === m ? "✓ " : "   ") + spellLabel(m),
+              detail: m === "auto" ? "pro Absatz erkannt" : undefined,
+              run: () => setSettings({ spell: m }),
+            })),
+          })
+        }
+      />
 
       {palette && (
         <Palette
@@ -992,59 +890,16 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
       )}
 
       {saveTpl && (
-        <div className="overlay" onMouseDown={() => setSaveTpl(null)}>
-          <div className="dialog small-dialog" onMouseDown={(e) => e.stopPropagation()}>
-            <div className="dialog-head">
-              <h2>Als Vorlage speichern</h2>
-              <p>
-                Alle Dateien außer <code>out/</code> werden kopiert. Platzhalter wie <code>{"{{titel}}"}</code> oder{" "}
-                <code>{"{{datum}}"}</code> in .typ-Dateien werden beim Anlegen ausgefüllt.
-              </p>
-            </div>
-            <div className="dialog-body" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <div className="field">
-                <label htmlFor="tpl-name">Name</label>
-                <input
-                  id="tpl-name"
-                  autoFocus
-                  value={saveTpl.name}
-                  onChange={(e) => setSaveTpl({ ...saveTpl, name: e.target.value, error: undefined })}
-                />
-              </div>
-              <div className="field">
-                <label htmlFor="tpl-desc">Beschreibung</label>
-                <input
-                  id="tpl-desc"
-                  placeholder="optional"
-                  value={saveTpl.description}
-                  onChange={(e) => setSaveTpl({ ...saveTpl, description: e.target.value })}
-                />
-              </div>
-              {saveTpl.error && <div className="form-error">{saveTpl.error}</div>}
-            </div>
-            <div className="dialog-foot">
-              <div className="grow" />
-              <button className="btn" onClick={() => setSaveTpl(null)}>
-                Abbrechen
-              </button>
-              <button
-                className="btn primary"
-                onClick={async () => {
-                  try {
-                    await flushSave();
-                    const dir = await api.saveAsTemplate(saveTpl.name, saveTpl.description);
-                    setSaveTpl(null);
-                    showToast({ text: `Vorlage „${saveTpl.name}“ gespeichert`, actions: [{ label: "Im Finder", run: () => revealItemInDir(dir) }] }, 6000);
-                  } catch (e) {
-                    setSaveTpl({ ...saveTpl, error: String(e) });
-                  }
-                }}
-              >
-                Speichern
-              </button>
-            </div>
-          </div>
-        </div>
+        <SaveTemplateDialog
+          initialName={saveTpl.name}
+          onClose={() => setSaveTpl(null)}
+          onSave={async (name, description) => {
+            await flushSave();
+            const dir = await api.saveAsTemplate(name, description);
+            setSaveTpl(null);
+            showToast({ text: `Vorlage „${name}“ gespeichert`, actions: [{ label: "Im Finder", run: () => revealItemInDir(dir) }] }, 6000);
+          }}
+        />
       )}
 
       {tableEdit && (
@@ -1071,51 +926,9 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
         />
       )}
 
-      {menu && (
-        <div
-          className="menu"
-          style={{
-            left: Math.min(menu.x, window.innerWidth - 250),
-            top: Math.max(8, Math.min(menu.y, window.innerHeight - 16 - menu.items.reduce((h, it) => h + (it === "sep" ? 11 : 28), 10))),
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {menu.items.map((it, i) =>
-            it === "sep" ? (
-              <hr key={i} />
-            ) : (
-              <button
-                key={i}
-                className={it.danger ? "danger" : undefined}
-                onClick={() => {
-                  setMenu(null);
-                  it.run();
-                }}
-              >
-                {it.label}
-                {it.detail && <span className="detail">{it.detail}</span>}
-              </button>
-            ),
-          )}
-        </div>
-      )}
+      {menu && <PopupMenu menu={menu} onClose={() => setMenu(null)} />}
 
-      {toast && (
-        <div className={"toast" + (toast.kind === "error" ? " error" : "")}>
-          <span>{toast.text}</span>
-          {toast.actions?.map((a) => (
-            <button
-              key={a.label}
-              onClick={() => {
-                a.run();
-                setToast(null);
-              }}
-            >
-              {a.label}
-            </button>
-          ))}
-        </div>
-      )}
+      {toast && <ToastView toast={toast} onDismiss={() => setToast(null)} />}
     </div>
   );
 }
