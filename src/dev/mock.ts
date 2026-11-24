@@ -1,6 +1,8 @@
 // Browser-only mock of the Tauri backend, used to work on the UI in a normal
 // browser (`npm run dev`). Never loaded inside the app or in production builds.
 import fixture from "./fixture.json";
+import musterPdf from "./muster.pdf?url";
+import musterPng from "./muster.png?url";
 
 const templates = [
   { id: "arbeitsblatt", name: "Arbeitsblatt", description: "Aufgaben mit Punkten, Rechenplatz und ein-/ausblendbaren Lösungen.", category: "Mathe & Physik" },
@@ -78,6 +80,7 @@ const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
   },
   absolute_path: ({ rel }) => "/Users/du/Documents/Typst/Physik/" + rel,
   read_file: () => disk,
+  read_bytes: async ({ rel }) => (await fetch(/\.pdf$/.test(rel as string) ? musterPdf : musterPng)).arrayBuffer(),
   open_text: () => ({ text: disk, hash: mockHash(disk) }),
   file_hash: () => mockHash(disk),
   write_file: ({ text, expected }) => {
@@ -104,7 +107,6 @@ const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
   },
   compile: () => fixture.compile,
   highlight: () => fixture.highlight,
-  set_solutions: () => null,
   jump_from_cursor: () => [{ page: 0, x: 120, y: 260 }],
   jump_from_click: () => ({ kind: "file", file: "main.typ", offset: 200 }),
   complete: () => ({

@@ -160,9 +160,10 @@ const DE_WORDS: &[&str] = &[
     "dieser", "dieses", "berechne", "bestimme", "gilt", "also", "mit", "einer", "eines", "wurde", "soll", "beim",
 ];
 const EN_WORDS: &[&str] = &[
-    "the", "and", "is", "not", "with", "a", "an", "of", "to", "in", "for", "on", "it", "that", "this", "are", "be",
-    "was", "we", "you", "they", "or", "but", "if", "by", "from", "as", "at", "which", "can", "has", "have", "will",
-    "these", "those", "there", "their", "its", "into", "than", "then", "so", "such", "each", "calculate", "determine",
+    // Keine Wörter, die es auch im Deutschen gibt (in, an, so, was, will).
+    "the", "and", "is", "not", "with", "a", "of", "to", "for", "on", "it", "that", "this", "are", "be",
+    "we", "you", "they", "or", "but", "if", "by", "from", "as", "at", "which", "can", "has", "have",
+    "these", "those", "there", "their", "its", "into", "than", "then", "such", "each", "calculate", "determine",
     "let", "show", "where", "when", "what", "how", "all", "any", "our", "your", "use", "used", "using",
 ];
 
@@ -171,6 +172,10 @@ pub fn detect(text: &str) -> Option<&'static str> {
     let mut de = 0i32;
     let mut en = 0i32;
     for word in text.split(|c: char| !c.is_alphabetic()).filter(|w| !w.is_empty()) {
+        // Abkürzungen wie „BE“ oder „ASCII“ sagen nichts über die Sprache.
+        if word.chars().count() > 1 && word.chars().all(|c| c.is_uppercase()) {
+            continue;
+        }
         let w = word.to_lowercase();
         if DE_WORDS.contains(&w.as_str()) {
             de += 2;
@@ -182,7 +187,9 @@ pub fn detect(text: &str) -> Option<&'static str> {
             de += 1;
         }
     }
-    if de == 0 && en == 0 {
+    // Ein einzelner Umlaut reicht nicht; solche kurzen Zeilen (Überschriften,
+    // Aufgabentitel) nehmen die Sprache ihrer Umgebung.
+    if de.max(en) < 2 {
         None
     } else if de >= en {
         Some("de")
@@ -370,6 +377,12 @@ mod tests {
         assert_eq!(detect("Berechne die Beschleunigung des Autos und gib das Ergebnis an."), Some("de"));
         assert_eq!(detect("Calculate the acceleration of the car and state the result."), Some("en"));
         assert_eq!(detect("Einleitung"), None);
+        // „(5 BE)“ ist kein englisches „be“, „in“ und „was“ sind auch deutsch.
+        assert_eq!(detect("Methode erläutern (5 BE)"), None);
+        assert_eq!(detect("Was steht in der Liste?"), Some("de"));
+        let aufgabe = "#aufgabe(nr: \"2.2\")[Methode `trageEin(…)` erläutern (5 BE)]\n\nDie Methode trägt ein Kennzeichen in die Tabelle ein.";
+        let (langs, _) = assign_languages(&paragraphs(aufgabe), "auto");
+        assert!(langs.iter().all(|l| l == "de"), "{langs:?}");
         let doc = "= Zusammenfassung\n\nDas ist ein deutscher Absatz mit einem Wort.\n\n= Summary\n\nThis is an English paragraph with the same idea.";
         let paras = paragraphs(doc);
         let (langs, dominant) = assign_languages(&paras, "auto");

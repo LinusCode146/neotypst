@@ -25,6 +25,7 @@ export function useFileActions({
   setMenu,
   insertImages,
   pathFromCurrent,
+  view,
 }: {
   project: OpenedProject;
   files: FileEntry[];
@@ -42,6 +43,8 @@ export function useFileActions({
   setMenu(m: Menu | null): void;
   insertImages(rels: string[]): void;
   pathFromCurrent(rel: string): string;
+  /** Zeigt ein PDF oder Bild im eingebauten Betrachter. */
+  view(rel: string, kind: "pdf" | "image"): void;
 }) {
   const setMainFile = useCallback(
     async (rel: string) => {
@@ -102,7 +105,7 @@ export function useFileActions({
 
   const treeActions: TreeActions = useMemo(
     () => ({
-      open: (rel) => openFile(rel),
+      open: (rel, kind) => (kind === "pdf" || kind === "image" ? view(rel, kind) : void openFile(rel)),
       insertImage: (rel) => insertImages([rel]),
       setMain: (rel) => setMainFile(rel),
       openExternal: (rel) => void api.absolutePath(rel).then(openPath),
@@ -165,7 +168,7 @@ export function useFileActions({
       },
       showMenu: (x, y, items) => setMenu({ x, y, items }),
     }),
-    [createFile, files, flushSave, insertImages, main, openFile, pathFromCurrent, project.root, refreshFiles, renameFile, setMainFile, showToast],
+    [createFile, files, flushSave, insertImages, main, openFile, pathFromCurrent, project.root, refreshFiles, renameFile, setMainFile, showToast, view],
   );
 
   return { setMainFile, createFile, renameFile, treeActions };
