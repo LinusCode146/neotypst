@@ -360,20 +360,34 @@ async fn render_snippet(state: State<'_, AppState>, code: String, key: Option<St
     state.engine.run(move |_| graphics::render_snippet(&code)).await
 }
 
-/// NSSpellChecker is used on the main thread, as AppKit expects.
+/// Hunspell runs on a worker thread; on macOS the system dictionary is then
+/// asked on the main thread, as AppKit expects.
 #[tauri::command]
 async fn spellcheck(app: tauri::AppHandle, text: String, mode: String, allowed: Vec<String>) -> Result<spell::SpellResult, String> {
-    let (tx, rx) = tokio::sync::oneshot::channel();
-    app.run_on_main_thread(move || {
-        let _ = tx.send(spell::check(&text, &mode, &allowed));
-    })
-    .map_err(|e| e.to_string())?;
-    rx.await.map_err(|e| e.to_string())
+    let pending = tauri::async_runtime::spawn_blocking(move || spell::find(&text, &mode, &allowed))
+        .await
+        .map_err(|e| e.to_string())?;
+    #[cfg(target_os = "macos")]
+    let pending = {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        app.run_on_main_thread(move || {
+            let mut pending = pending;
+            spell::system_pass(&mut pending);
+            let _ = tx.send(pending);
+        })
+        .map_err(|e| e.to_string())?;
+        rx.await.map_err(|e| e.to_string())?
+    };
+    #[cfg(not(target_os = "macos"))]
+    let _ = app;
+    tauri::async_runtime::spawn_blocking(move || spell::suggest(pending, std::time::Duration::from_millis(300)))
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-async fn learn_word(app: tauri::AppHandle, word: String) -> Result<(), String> {
-    app.run_on_main_thread(move || spell::learn(&word)).map_err(|e| e.to_string())
+async fn learn_word(word: String) -> Result<(), String> {
+    spell::learn(&word)
 }
 
 #[tauri::command]
@@ -413,6 +427,13 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .setup(|app| {
+            use tauri::Manager;
+            // Bundled dictionaries and the user's own word list ("Zum Wörterbuch").
+            let dictionaries = app.path().resource_dir().map(|d| d.join("dictionaries")).unwrap_or_default();
+            spell::init(dictionaries, app.path().app_data_dir()?.join("woerterbuch.txt"));
+            Ok(())
+        })
         .manage(AppState { engine: EngineHandle::spawn(), root: Mutex::new(None), previews: Default::default() })
         .invoke_handler(tauri::generate_handler![
             projects_dir,
