@@ -2,6 +2,7 @@ mod bib;
 mod engine;
 mod format;
 mod graphics;
+mod history;
 mod project;
 mod spell;
 mod symbols;
@@ -118,9 +119,37 @@ fn read_file(state: State<'_, AppState>, rel: String) -> Result<String, String> 
     project::read_text(&state.root()?, &rel)
 }
 
+/// Speichert und gibt die neue Prüfsumme zurück. Mit `expected` verweigert es
+/// das Speichern, wenn die Datei inzwischen von außen geändert wurde.
 #[tauri::command]
-fn write_file(state: State<'_, AppState>, rel: String, text: String) -> Result<(), String> {
-    project::write_text(&state.root()?, &rel, &text)
+fn write_file(state: State<'_, AppState>, rel: String, text: String, expected: Option<String>) -> Result<String, String> {
+    project::save_text(&state.root()?, &rel, &text, expected.as_deref(), history::jetzt())
+}
+
+#[tauri::command]
+fn open_text(state: State<'_, AppState>, rel: String) -> Result<project::Opened, String> {
+    project::open_text(&state.root()?, &rel)
+}
+
+#[tauri::command]
+fn file_hash(state: State<'_, AppState>, rel: String) -> Result<Option<String>, String> {
+    project::file_hash(&state.root()?, &rel)
+}
+
+#[tauri::command]
+fn history_list(state: State<'_, AppState>, rel: String) -> Result<Vec<history::Stand>, String> {
+    history::liste(&state.root()?, &rel)
+}
+
+#[tauri::command]
+fn history_read(state: State<'_, AppState>, rel: String, id: String) -> Result<String, String> {
+    history::lesen(&state.root()?, &rel, &id)
+}
+
+/// Sichert einen Stand, etwa den Editor-Inhalt vor dem Neuladen.
+#[tauri::command]
+fn history_snapshot(state: State<'_, AppState>, rel: String, text: String, reason: String) -> Result<bool, String> {
+    history::sichern(&state.root()?, &rel, &text, &reason, history::jetzt())
 }
 
 #[tauri::command]
@@ -356,6 +385,11 @@ pub fn run() {
             list_files,
             read_file,
             write_file,
+            open_text,
+            file_hash,
+            history_list,
+            history_read,
+            history_snapshot,
             create_file,
             rename_file,
             import_files,

@@ -77,8 +77,20 @@ const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
     return null;
   },
   absolute_path: ({ rel }) => "/Users/du/Documents/Typst/Physik/" + rel,
-  read_file: () => fixture.main,
-  write_file: () => null,
+  read_file: () => disk,
+  open_text: () => ({ text: disk, hash: mockHash(disk) }),
+  file_hash: () => mockHash(disk),
+  write_file: ({ text, expected }) => {
+    if (expected != null && expected !== mockHash(disk)) throw "konflikt: Die Datei wurde außerhalb von NeoTypst geändert";
+    disk = text as string;
+    return mockHash(disk);
+  },
+  history_list: () => verlauf.map((v, i) => ({ id: `${v.zeit}_${v.grund}.txt`, zeit: v.zeit, grund: v.grund, bytes: v.text.length, i })),
+  history_read: ({ id }) => verlauf.find((v) => id === `${v.zeit}_${v.grund}.txt`)?.text ?? "",
+  history_snapshot: ({ text, reason }) => {
+    verlauf.unshift({ zeit: Date.now(), grund: reason as string, text: text as string });
+    return true;
+  },
   compile: () => fixture.compile,
   highlight: () => fixture.highlight,
   set_solutions: () => null,
@@ -183,6 +195,17 @@ const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
   "plugin:event|listen": () => 1,
   "plugin:event|unlisten": () => null,
 };
+
+// Platte und Verlauf im Speicher. `__mockAussen("…")` in der Konsole
+// simuliert eine Änderung von außen.
+let disk = fixture.main;
+const mockHash = (t: string) => String(t.length) + ":" + [...t].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 7);
+const verlauf: { zeit: number; grund: string; text: string }[] = [
+  { zeit: Date.now() - 4 * 60_000, grund: "auto", text: fixture.main.replace(/\n[^\n]*$/, "") },
+  { zeit: Date.now() - 50 * 60_000, grund: "loeschung", text: fixture.main + "\n\n= Beispielaufgabe\n\nDrei Münzen werden geworfen …\n" },
+  { zeit: Date.now() - 26 * 3600_000, grund: "auto", text: "= Erster Entwurf\n" },
+];
+(window as unknown as Record<string, unknown>).__mockAussen = (t: string) => (disk = t);
 
 let cb = 0;
 (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {

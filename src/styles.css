@@ -2658,3 +2658,106 @@ kbd.on-primary {
 :root[data-os="windows"] .titlebar {
   padding-left: 10px;
 }
+
+/* ---------- Verlauf ---------- */
+
+.history-dialog {
+  width: min(980px, 94vw);
+  height: min(640px, 80vh);
+}
+.history-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 230px 1fr;
+  margin-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.history-list {
+  overflow: auto;
+  padding: 6px;
+  border-right: 1px solid var(--line);
+  background: var(--panel);
+}
+.history-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: default;
+}
+.history-item.selected {
+  background: var(--accent-soft);
+}
+.history-reason {
+  font-size: 11.5px;
+  color: var(--warning);
+}
+.history-empty,
+.history-same {
+  padding: 10px;
+}
+.history-preview {
+  margin: 0;
+  overflow: auto;
+  padding: 10px 0;
+  font: 12.5px/1.5 var(--font-mono);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.history-preview > div {
+  padding: 0 14px;
+}
+.diff-add {
+  background: color-mix(in srgb, var(--ok) 14%, transparent);
+}
+.diff-del {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--danger) 45%, transparent);
+}
+.history-preview > .diff-skip {
+  margin: 4px 0;
+  padding: 2px 14px;
+  color: var(--muted);
+  font-family: var(--font-ui, inherit);
+  font-size: 11.5px;
+  background: var(--panel);
+  border-block: 1px solid var(--line);
+}
+.history-legend span {
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+/* ---------- Konflikt mit Änderungen von außen ---------- */
+
+.conflict-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--warning) 12%, var(--panel));
+  font-size: 13px;
+}
+.conflict-bar {
+  flex-wrap: wrap;
+}
+.conflict-bar svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--warning);
+}
+.conflict-text {
+  flex: 1 1 240px;
+}

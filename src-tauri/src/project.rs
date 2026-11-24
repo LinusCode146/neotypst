@@ -169,12 +169,85 @@ pub fn read_text(root: &Path, rel: &str) -> Result<String, String> {
     fs::read_to_string(resolve(root, rel)?).map_err(|e| e.to_string())
 }
 
+/// Schreibt sicher: erst in eine Nachbardatei, dann umbenennen. Die Datei ist
+/// damit immer ganz alt oder ganz neu, auch bei Absturz oder voller Platte.
 pub fn write_text(root: &Path, rel: &str, text: &str) -> Result<(), String> {
     let path = resolve(root, rel)?;
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    let parent = path.parent().ok_or("Ungültiger Pfad")?;
+    fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    let name = path.file_name().ok_or("Ungültiger Pfad")?.to_string_lossy();
+    let tmp = parent.join(format!(".{name}.neotypst-tmp"));
+    let result = (|| {
+        use std::io::Write;
+        let mut f = fs::File::create(&tmp)?;
+        f.write_all(text.as_bytes())?;
+        f.sync_all()?;
+        fs::rename(&tmp, &path)
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(&tmp);
     }
-    fs::write(path, text).map_err(|e| e.to_string())
+    result.map_err(|e| e.to_string())
+}
+
+/// Prüfsumme eines Inhalts, um fremde Änderungen zu erkennen.
+pub fn hash_text(text: &str) -> String {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    text.hash(&mut h);
+    format!("{:016x}", h.finish())
+}
+
+#[derive(Serialize)]
+pub struct Opened {
+    pub text: String,
+    pub hash: String,
+}
+
+/// Liest eine Datei für den Editor, mit Prüfsumme für das spätere Speichern.
+pub fn open_text(root: &Path, rel: &str) -> Result<Opened, String> {
+    let text = read_text(root, rel)?;
+    Ok(Opened { hash: hash_text(&text), text })
+}
+
+/// Prüfsumme der Datei auf der Platte, `None` wenn es sie nicht (mehr) gibt.
+pub fn file_hash(root: &Path, rel: &str) -> Result<Option<String>, String> {
+    Ok(fs::read_to_string(resolve(root, rel)?).ok().map(|t| hash_text(&t)))
+}
+
+pub const KONFLIKT: &str = "konflikt";
+
+/// Speichert aus dem Editor und führt den Verlauf.
+///
+/// `expected` ist die Prüfsumme des Stands, den der Editor zuletzt gelesen
+/// oder geschrieben hat. Steht auf der Platte etwas anderes, wurde die Datei
+/// von außen geändert: dann wird nichts geschrieben und der Fehler beginnt mit
+/// [`KONFLIKT`]. Ohne `expected` wird überschrieben, der alte Inhalt kommt
+/// vorher in den Verlauf. Gibt die Prüfsumme des neuen Inhalts zurück.
+pub fn save_text(root: &Path, rel: &str, text: &str, expected: Option<&str>, zeit: u64) -> Result<String, String> {
+    use crate::history;
+    let alt = fs::read_to_string(resolve(root, rel)?).ok();
+    // Versteckte Dateien (Wörterliste …) brauchen keinen Verlauf.
+    let verlauf = !rel.split('/').any(|t| t.starts_with('.'));
+    if let Some(alt) = &alt {
+        if let Some(exp) = expected
+            && hash_text(alt) != exp
+        {
+            return Err(format!("{KONFLIKT}: Die Datei wurde außerhalb von NeoTypst geändert"));
+        }
+        if verlauf && alt != text {
+            if expected.is_none() {
+                let _ = history::sichern(root, rel, alt, "vor-ueberschreiben", zeit);
+            } else if history::entfernt(alt, text) >= history::LOESCHSCHWELLE {
+                let _ = history::sichern(root, rel, alt, "loeschung", zeit);
+            }
+        }
+    }
+    write_text(root, rel, text)?;
+    if verlauf {
+        let _ = history::sichern(root, rel, text, "auto", zeit);
+    }
+    Ok(hash_text(text))
 }
 
 pub fn create_file(root: &Path, rel: &str) -> Result<(), String> {
@@ -363,6 +436,46 @@ mod file_ops_tests {
         assert_eq!(save_asset(&root, "Bildschirmfoto 2026-11-21 um 10.02.png", b"x").unwrap(), "assets/Bildschirmfoto-2026-11-21-um-10-02.png");
         assert_eq!(save_asset(&root, "Graph.JPG", b"x").unwrap(), "assets/Graph.jpg");
         assert_eq!(save_asset(&root, "Graph.jpg", b"x").unwrap(), "assets/Graph-2.jpg");
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn save_detects_conflicts_and_keeps_history() {
+        let root = std::env::temp_dir().join("neotypst-save-test");
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        let t0 = 1_000_000_000_000;
+
+        write_text(&root, "main.typ", "Anfang").unwrap();
+        let o = open_text(&root, "main.typ").unwrap();
+        let h1 = save_text(&root, "main.typ", "Anfang und mehr", Some(&o.hash), t0).unwrap();
+        assert_eq!(file_hash(&root, "main.typ").unwrap().as_deref(), Some(h1.as_str()));
+        assert!(!root.join(".main.typ.neotypst-tmp").exists());
+
+        // Von außen geändert: Speichern verweigert, Datei bleibt.
+        fs::write(root.join("main.typ"), "von außen").unwrap();
+        let e = save_text(&root, "main.typ", "aus dem Editor", Some(&h1), t0 + 1).unwrap_err();
+        assert!(e.starts_with(KONFLIKT));
+        assert_eq!(read_text(&root, "main.typ").unwrap(), "von außen");
+
+        // Überschreiben ohne Prüfsumme sichert den fremden Inhalt vorher.
+        save_text(&root, "main.typ", "aus dem Editor", None, t0 + 2).unwrap();
+        let l = crate::history::liste(&root, "main.typ").unwrap();
+        assert!(l.iter().any(|s| s.grund == "vor-ueberschreiben"
+            && crate::history::lesen(&root, "main.typ", &s.id).unwrap() == "von außen"));
+
+        // Viel gelöscht: der alte Inhalt kommt sofort in den Verlauf.
+        let lang = format!("Aufgabe: {}", "Text ".repeat(60));
+        let h = save_text(&root, "main.typ", &lang, None, t0 + 3).unwrap();
+        save_text(&root, "main.typ", "Aufgabe:", Some(&h), t0 + 4).unwrap();
+        let l = crate::history::liste(&root, "main.typ").unwrap();
+        let s = l.iter().find(|s| s.grund == "loeschung").expect("Stand vor dem Löschen");
+        assert_eq!(crate::history::lesen(&root, "main.typ", &s.id).unwrap(), lang);
+
+        // Versteckte Dateien haben keinen Verlauf, der Verlauf ist versteckt.
+        save_text(&root, ".neotypst-woerter.txt", "Wort", None, t0).unwrap();
+        assert!(crate::history::liste(&root, ".neotypst-woerter.txt").unwrap().is_empty());
+        assert_eq!(walk_files(&root), vec!["main.typ".to_string()]);
         let _ = fs::remove_dir_all(&root);
     }
 

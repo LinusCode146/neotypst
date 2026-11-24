@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { openPath, openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 
-import { api, type BibOverview, type CompileOut, type Diag, type FileEntry, type OpenedProject } from "./api";
+import { api, isConflict, type BibOverview, type CompileOut, type Diag, type FileEntry, type HistoryEntry, type OpenedProject } from "./api";
+import { HistoryDialog, zeitText } from "./HistoryDialog";
 import { LiteratureDialog } from "./LiteratureDialog";
 import { Editor, type EditorHandle } from "./editor/Editor";
 import { SNIPPETS, matrixSnippet, tableSnippet } from "./editor/snippets";
@@ -94,6 +95,16 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
   const latest = useRef<{ rel: string; text: string } | null>(null);
   const compileFlags = useRef({ inflight: false, pending: false });
   const unsaved = useRef(new Map<string, string>());
+  /** Prüfsumme je Datei, wie sie der Editor zuletzt gelesen oder gespeichert hat. */
+  const hashes = useRef(new Map<string, string>());
+  /** Datei, die von außen geändert wurde, während hier ungespeicherte Änderungen lagen. */
+  const [conflict, setConflictState] = useState<string | null>(null);
+  const conflictRef = useRef<string | null>(null);
+  const setConflict = (rel: string | null) => {
+    conflictRef.current = rel;
+    setConflictState(rel);
+  };
+  const [historyOpen, setHistoryOpen] = useState(false);
   const saveTimer = useRef<number | undefined>(undefined);
   const lastEdit = useRef(0);
   const cursorTimer = useRef<number | undefined>(undefined);
@@ -233,11 +244,17 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
     const entries = [...unsaved.current.entries()];
     unsaved.current.clear();
     for (const [rel, t] of entries) {
+      // Bis der Konflikt gelöst ist, bleibt die Datei ungespeichert.
+      if (conflictRef.current === rel) {
+        unsaved.current.set(rel, t);
+        continue;
+      }
       try {
-        await api.writeFile(rel, t);
+        hashes.current.set(rel, await api.writeFile(rel, t, hashes.current.get(rel) ?? null));
       } catch (e) {
         unsaved.current.set(rel, t);
-        showToast({ text: `Speichern fehlgeschlagen: ${e}`, kind: "error" });
+        if (isConflict(e)) setConflict(rel);
+        else showToast({ text: `Speichern fehlgeschlagen: ${e}`, kind: "error" });
       }
     }
     setDirty(unsaved.current.size > 0);
@@ -247,12 +264,76 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
     setFiles(await api.listFiles());
   }, []);
 
+  // Die offene Datei wurde außerhalb von NeoTypst geändert (anderer Editor,
+  // Git, Finder): ohne eigene Änderungen still neu laden, sonst nachfragen.
+  const checkExternal = useCallback(async () => {
+    const rel = currentRef.current;
+    if (!rel || conflictRef.current) return;
+    const disk = await api.fileHash(rel).catch(() => null);
+    if (disk == null || disk === hashes.current.get(rel)) return;
+    if (unsaved.current.has(rel)) {
+      setConflict(rel);
+      return;
+    }
+    const o = await api.openText(rel);
+    if (currentRef.current !== rel || !editor.current) return;
+    const mine = editor.current.getText();
+    await api.historySnapshot(rel, mine, "vor-neuladen").catch(() => {});
+    hashes.current.set(rel, o.hash);
+    editor.current.applyEdit(0, mine.length, o.text);
+    showToast({ text: `${rel} wurde außerhalb geändert und neu geladen` });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showToast]);
+
+  const resolveConflict = useCallback(
+    async (keep: "mine" | "disk") => {
+      const rel = conflictRef.current;
+      if (!rel || !editor.current) return;
+      const mine = editor.current.getText();
+      try {
+        if (keep === "mine") {
+          // Ohne Prüfsumme: überschreibt, die fremde Fassung kommt vorher in den Verlauf.
+          hashes.current.set(rel, await api.writeFile(rel, mine, null));
+          unsaved.current.delete(rel);
+          setConflict(null);
+        } else {
+          await api.historySnapshot(rel, mine, "vor-neuladen");
+          const o = await api.openText(rel);
+          hashes.current.set(rel, o.hash);
+          unsaved.current.delete(rel);
+          setConflict(null);
+          editor.current.applyEdit(0, mine.length, o.text);
+        }
+        setDirty(unsaved.current.size > 0);
+      } catch (e) {
+        showToast({ text: String(e), kind: "error" });
+      }
+    },
+    [showToast],
+  );
+
+  const restoreFromHistory = useCallback(
+    async (text: string, entry: HistoryEntry) => {
+      const rel = currentRef.current;
+      if (!rel || !editor.current) return;
+      const mine = editor.current.getText();
+      await api.historySnapshot(rel, mine, "vor-wiederherstellen").catch(() => {});
+      editor.current.applyEdit(0, mine.length, text);
+      setHistoryOpen(false);
+      showToast({ text: `Stand von ${zeitText(entry.zeit)} wiederhergestellt. ${kbd("⌘Z")} macht es rückgängig.` }, 5000);
+    },
+    [showToast],
+  );
+
   // Pick up files added or removed in the Finder when coming back to the app.
   useEffect(() => {
-    const onFocus = () => void refreshFiles().catch(() => {});
+    const onFocus = () => {
+      void refreshFiles().catch(() => {});
+      void checkExternal().catch(() => {});
+    };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-  }, [refreshFiles]);
+  }, [refreshFiles, checkExternal]);
 
   const openFile = useCallback(
     async (rel: string, reveal?: number) => {
@@ -262,7 +343,8 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
       }
       await flushSave();
       try {
-        const t = await api.readFile(rel);
+        const { text: t, hash } = await api.openText(rel);
+        hashes.current.set(rel, hash);
         editor.current?.openFile(rel, t);
         setCurrent(rel);
         setText(t);
@@ -1018,6 +1100,14 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
       { id: "ln", label: `Zeilennummern ${settings.lineNumbers ? "aus" : "an"}`, group: "Einstellungen", icon: <Icon.settings />, run: () => setSettings({ lineNumbers: !settings.lineNumbers }) },
       { id: "mathquote", label: `Text in Formeln automatisch quoten ${settings.mathQuote ? "aus" : "an"}`, group: "Einstellungen", icon: <Icon.settings />, run: () => setSettings({ mathQuote: !settings.mathQuote }) },
       { id: "wrap", label: `Zeilenumbruch ${settings.wrap ? "aus" : "an"}`, group: "Einstellungen", icon: <Icon.settings />, run: () => setSettings({ wrap: !settings.wrap }) },
+      {
+        id: "history",
+        label: "Verlauf dieser Datei",
+        detail: "frühere Stände",
+        group: "Aktionen",
+        icon: <Icon.book />,
+        run: () => currentRef.current && setHistoryOpen(true),
+      },
       { id: "sidebar", label: `Seitenleiste ${settings.sidebar ? "ausblenden" : "einblenden"}`, detail: kbd("⌘\\"), group: "Einstellungen", icon: <Icon.sidebar />, run: () => setSettings({ sidebar: !settings.sidebar }) },
       { id: "font+", label: "Editor-Schrift größer", detail: `${settings.fontSize}px`, group: "Einstellungen", icon: <Icon.zoomIn />, run: () => setSettings({ fontSize: Math.min(24, settings.fontSize + 1) }) },
       { id: "font-", label: "Editor-Schrift kleiner", detail: `${settings.fontSize}px`, group: "Einstellungen", icon: <Icon.zoomOut />, run: () => setSettings({ fontSize: Math.max(10, settings.fontSize - 1) }) },
@@ -1250,6 +1340,20 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
         )}
 
         <section className="editor-pane" style={{ flexBasis: `${split * 100}%` }}>
+          {conflict && conflict === current && (
+            <div className="conflict-bar" role="alert">
+              <Icon.alert />
+              <span className="conflict-text">
+                <b>{conflict}</b> wurde außerhalb von NeoTypst geändert. Deine Änderungen hier sind noch nicht gespeichert.
+              </span>
+              <button className="btn" onClick={() => void resolveConflict("disk")}>
+                Neu laden
+              </button>
+              <button className="btn primary" onClick={() => void resolveConflict("mine")}>
+                Meine Version behalten
+              </button>
+            </div>
+          )}
           <Editor
             ref={editor}
             onChange={onChange}
@@ -1403,6 +1507,15 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
             setSymbolsOpen(false);
             editor.current?.focus();
           }}
+        />
+      )}
+
+      {historyOpen && current && (
+        <HistoryDialog
+          rel={current}
+          current={editor.current?.getText() ?? text}
+          onRestore={(t, e) => void restoreFromHistory(t, e)}
+          onClose={() => setHistoryOpen(false)}
         />
       )}
 
