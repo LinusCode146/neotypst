@@ -435,7 +435,7 @@ mod tests {
     /// Farben, die nur in ihrem Bereich gelten. Die Prüfungen laufen in Typst.
     #[test]
     fn stil_rules() {
-        let dir = std::env::temp_dir().join("neotypst-stil-test");
+        let dir = std::env::temp_dir().join("neotypst-stil-regeln-test");
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join("templates")).unwrap();
         std::fs::write(dir.join("templates/stil.typ"), STIL.1).unwrap();
