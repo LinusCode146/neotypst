@@ -7,9 +7,11 @@ import { StilDialog } from "./StilDialog";
 import { HistoryDialog, zeitText } from "./HistoryDialog";
 import { LiteratureDialog } from "./LiteratureDialog";
 import { Editor, type EditorHandle } from "./editor/Editor";
-import { SNIPPETS, matrixSnippet, tableSnippet } from "./editor/snippets";
+import { matrixSnippet, tableSnippet } from "./editor/snippets";
 import { Icon } from "./icons";
 import { Palette, type PaletteItem } from "./Palette";
+import { handleKey, keyLabel, paletteItems, withKeys, type Command } from "./workspace/commands";
+import { buildCommands, SPELL_MODES, spellLabel } from "./workspace/commandList";
 import { Preview, type Marker, type PageView, type PreviewHandle } from "./Preview";
 import { getSettings, setSettings, useSettings } from "./settings";
 
@@ -20,10 +22,10 @@ import { MatrixEditor, emptyMatrix, generateMatrix, parseMatrix, type MatrixGrid
 import { SymbolPalette } from "./SymbolPalette";
 import { GraphicsGallery } from "./GraphicsGallery";
 import { SearchPanel } from "./SearchPanel";
-import { beforeRestart, checkForUpdate } from "./updater";
-import { GRAPHICS, type GraphicBlock } from "./graphics";
+import { beforeRestart } from "./updater";
+import type { GraphicBlock } from "./graphics";
 import type { SymbolEntry } from "./symbolData";
-import { isMac, kbd, modKey } from "./platform";
+import { kbd } from "./platform";
 import { outlineOf } from "./outline";
 
 type Toast = { text: string; kind?: "error"; actions?: { label: string; run(): void }[] };
@@ -192,8 +194,6 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
     [runSpell, showToast],
   );
 
-  const SPELL_MODES = ["auto", "de", "en", "off"] as const;
-  const spellLabel = (m: string) => ({ auto: "Automatisch", de: "Deutsch", en: "Englisch", off: "Aus" })[m] ?? m;
 
   // ---------- Compile ----------
 
@@ -874,67 +874,6 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
 
   const zoom = (z: number) => setSettings({ zoom: Math.min(4, Math.max(0.25, Math.round(z * 1000) / 1000)) });
 
-  // Global shortcuts.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (!modKey(e)) return;
-      // Unter Windows ist die Befehlstaste Strg: Strg-J/K/N/P gehören dann der Vorschlagsliste.
-      if (!isMac && document.querySelector(".cm-tooltip-autocomplete")) return;
-      const k = e.key.toLowerCase();
-      if (k === "k") {
-        e.preventDefault();
-        setPalette((p) => (p ? null : "all"));
-      } else if (k === "p") {
-        e.preventDefault();
-        setPalette((p) => (p ? null : "files"));
-      } else if (k === "l" && e.altKey) {
-        e.preventDefault();
-        const order = ["auto", "de", "en"] as const;
-        const next = order[(order.indexOf(settings.spell as (typeof order)[number]) + 1) % order.length];
-        setSettings({ spell: next });
-        showToast({ text: `Rechtschreibung: ${spellLabel(next)}` }, 1500);
-      } else if (k === "f" && e.shiftKey && !e.altKey) {
-        e.preventDefault();
-        openSearch();
-      } else if (k === "b" && e.shiftKey) {
-        e.preventDefault();
-        setLitOpen(true);
-      } else if (k === "g" && e.shiftKey) {
-        e.preventDefault();
-        setGraphicsOpen(true);
-      } else if (k === "s" && e.shiftKey) {
-        e.preventDefault();
-        setSymbolsOpen(true);
-      } else if (k === "t" && !e.shiftKey) {
-        e.preventDefault();
-        if (!tableEdit && !matEdit) openGridEditor();
-      } else if (k === "e") {
-        e.preventDefault();
-        exportPdf(e.shiftKey);
-      } else if (k === "l" && e.shiftKey) {
-        e.preventDefault();
-        toggleSolutions();
-      } else if (k === "\\") {
-        e.preventDefault();
-        setSettings({ sidebar: !settings.sidebar });
-      } else if (k === "=" || k === "+") {
-        e.preventDefault();
-        zoom(settings.zoom * 1.15);
-      } else if (k === "-") {
-        e.preventDefault();
-        zoom(settings.zoom / 1.15);
-      } else if (k === "0") {
-        e.preventDefault();
-        zoom(1);
-      } else if (k === "s") {
-        e.preventDefault();
-        flushSave();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  });
-
   // ---------- Splitter ----------
 
   const panes = useRef<HTMLDivElement>(null);
@@ -963,197 +902,71 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
 
   // ---------- Palette ----------
 
-  const paletteItems = useMemo((): PaletteItem[] => {
-    const fileItems: PaletteItem[] = files.filter((f) => f.kind !== "dir").map((f) => ({
-      id: "file:" + f.path,
-      label: f.path,
-      group: "Dateien",
-      icon: fileIcon(f.kind),
-      detail: f.path === main ? "Hauptdatei" : undefined,
-      run: () => {
-        if (f.kind === "typ" || f.kind === "text") openFile(f.path);
-        else if (f.kind === "image") insertImages([f.path]);
-        else api.absolutePath(f.path).then(openPath);
-      },
-    }));
-    if (palette === "files") return fileItems;
+  const fileCommands = useMemo(
+    (): Command[] =>
+      files
+        .filter((f) => f.kind !== "dir")
+        .map((f) => ({
+          id: "file:" + f.path,
+          label: f.path,
+          group: "Dateien",
+          icon: fileIcon(f.kind),
+          detail: f.path === main ? "Hauptdatei" : undefined,
+          run: () => {
+            if (f.kind === "typ" || f.kind === "text") openFile(f.path);
+            else if (f.kind === "image") insertImages([f.path]);
+            else api.absolutePath(f.path).then(openPath);
+          },
+        })),
+    [files, main, openFile, insertImages],
+  );
 
-    const actions: PaletteItem[] = [
-      { id: "export", label: "Als PDF exportieren", detail: kbd("⌘E"), group: "Aktionen", icon: <Icon.export />, run: () => exportPdf(false) },
-      {
-        id: "export-both",
-        label: "PDF exportieren: Aufgaben + Lösungen",
-        detail: kbd("⌘⇧E"),
-        keywords: "beide loesung",
-        group: "Aktionen",
-        icon: <Icon.export />,
-        run: () => exportPdf(true),
+  const commands = buildCommands(
+    {
+      settings,
+      solutions,
+      project,
+      main,
+      togglePalette: (kind) => setPalette((p) => (p ? null : kind)),
+      exportPdf: (both) => void exportPdf(both),
+      toggleSolutions: () => void toggleSolutions(),
+      editorCommand: (name) => editor.current?.command(name),
+      insertSnippet: (body) => editor.current?.insertSnippet(body),
+      openLiterature: () => setLitOpen(true),
+      openGraphics: () => setGraphicsOpen(true),
+      insertGraphic,
+      openSymbols: () => setSymbolsOpen(true),
+      openGridEditor: () => {
+        if (!tableEdit && !matEdit) void openGridEditor();
       },
-      {
-        id: "solutions",
-        label: solutions ? "Lösungen ausblenden" : "Lösungen einblenden",
-        detail: kbd("⌘⇧L"),
-        keywords: "loesung",
-        group: "Aktionen",
-        icon: <Icon.eye />,
-        run: toggleSolutions,
+      openTableEditor: () => void openTableEditor(),
+      openMatrixEditor: () => void openMatrixEditor(),
+      saveAsTemplate: () => setSaveTpl({ name: project.name, description: "" }),
+      openSearch,
+      formatDocument: () => void formatDocument(),
+      requestTree,
+      openStil: () => void refreshStil().then(() => setStilOpen(true)),
+      openHistory: () => currentRef.current && setHistoryOpen(true),
+      cycleSpell: () => {
+        const order = ["auto", "de", "en"] as const;
+        const next = order[(order.indexOf(settings.spell as (typeof order)[number]) + 1) % order.length];
+        setSettings({ spell: next });
+        showToast({ text: `Rechtschreibung: ${spellLabel(next)}` }, 1500);
       },
-      {
-        id: "convert-table",
-        label: "Markdown-Tabelle in Typst umwandeln",
-        detail: kbd("⌘⇧T"),
-        keywords: "pipe tabelle",
-        group: "Aktionen",
-        icon: <Icon.table />,
-        run: () => editor.current?.command("convertTable"),
-      },
-      {
-        id: "literature",
-        label: "Literatur & Zitate …",
-        detail: kbd("⌘⇧B"),
-        keywords: "literatur zitat quelle bibliography doi isbn cite bib",
-        group: "Aktionen",
-        icon: <Icon.book />,
-        run: () => setLitOpen(true),
-      },
-      {
-        id: "graphics",
-        label: "Grafik einfügen …",
-        detail: kbd("⌘⇧G"),
-        keywords: "grafik diagramm plot koordinatensystem schaltkreis flussdiagramm",
-        group: "Aktionen",
-        icon: <Icon.chart />,
-        run: () => setGraphicsOpen(true),
-      },
-      ...GRAPHICS.map((g) => ({
-        id: "graphic:" + g.id,
-        label: g.label,
-        detail: g.category,
-        keywords: "grafik " + g.description,
-        group: "Einfügen · Grafiken",
-        icon: <Icon.chart />,
-        run: () => insertGraphic(g),
-      })),
-      {
-        id: "symbols",
-        label: "Symbolpalette öffnen",
-        detail: kbd("⌘⇧S"),
-        keywords: "symbol griechisch pfeil zeichen sonderzeichen",
-        group: "Aktionen",
-        icon: <Icon.math />,
-        run: () => setSymbolsOpen(true),
-      },
-      {
-        id: "table-editor",
-        label: "Tabellen-Editor öffnen",
-        detail: kbd("⌘T"),
-        keywords: "tabelle grid bearbeiten",
-        group: "Aktionen",
-        icon: <Icon.table />,
-        run: openTableEditor,
-      },
-      {
-        id: "matrix-editor",
-        label: "Matrix-Editor öffnen",
-        detail: kbd("⌘T in Formeln"),
-        keywords: "matrix mat vektor vec determinante lgs gauß",
-        group: "Aktionen",
-        icon: <Icon.table />,
-        run: openMatrixEditor,
-      },
-      {
-        id: "save-template",
-        label: "Projekt als Vorlage speichern …",
-        keywords: "vorlage template",
-        group: "Aktionen",
-        icon: <Icon.star />,
-        run: () => setSaveTpl({ name: project.name, description: "" }),
-      },
-      {
-        id: "project-search",
-        label: "Im Projekt suchen und ersetzen",
-        detail: kbd("⌘⇧F"),
-        keywords: "suchen finden ersetzen replace search alle dateien",
-        group: "Aktionen",
-        icon: <Icon.search />,
-        run: openSearch,
-      },
-      {
-        id: "format",
-        label: "Dokument formatieren",
-        detail: kbd("⌥⇧F"),
-        keywords: "format formatieren aufräumen einrücken typstyle auswahl",
-        group: "Aktionen",
-        icon: <Icon.code />,
-        run: formatDocument,
-      },
-      {
-        id: "update",
-        label: "Nach Updates suchen",
-        keywords: "update version aktualisieren",
-        group: "Aktionen",
-        icon: <Icon.bolt />,
-        run: () => void checkForUpdate(true),
-      },
-      { id: "new-file", label: "Neue Datei …", group: "Aktionen", icon: <Icon.plus />, run: () => requestTree("file") },
-      { id: "new-dir", label: "Neuer Ordner …", keywords: "ordner verzeichnis", group: "Aktionen", icon: <Icon.folder />, run: () => requestTree("dir") },
-      {
-        id: "finder",
-        label: "Projektordner im Finder zeigen",
-        group: "Aktionen",
-        icon: <Icon.folderOpen />,
-        run: () => revealItemInDir(project.root + "/" + main),
-      },
-      { id: "home", label: "Zur Projektübersicht", group: "Aktionen", icon: <Icon.home />, run: onClose },
-    ];
-    const insert: PaletteItem[] = SNIPPETS.map((s) => ({
-      id: "snip:" + s.label,
-      label: s.detail,
-      detail: s.label + " ⇥",
-      keywords: s.label + " " + s.group,
-      group: "Einfügen · " + s.group,
-      icon: s.group === "Tabellen" ? <Icon.table /> : s.group === "Mathe" ? <Icon.math /> : s.group === "Informatik" ? <Icon.code /> : <Icon.bolt />,
-      run: () => editor.current?.insertSnippet(s.body),
-    }));
-    const prefs: PaletteItem[] = [
-      ...SPELL_MODES.map((m) => ({
-        id: "spell-" + m,
-        label: `Rechtschreibung: ${spellLabel(m)}${settings.spell === m ? " ✓" : ""}`,
-        detail: m === "auto" ? "Sprache pro Absatz erkennen" : undefined,
-        keywords: "rechtschreibung sprache deutsch englisch spell language",
-        group: "Einstellungen",
-        icon: <Icon.check />,
-        run: () => setSettings({ spell: m }),
-      })),
-      { id: "vim", label: `Vim-Modus ${settings.vim ? "ausschalten" : "einschalten"}`, group: "Einstellungen", icon: <Icon.settings />, run: () => setSettings({ vim: !settings.vim }) },
-      { id: "ln", label: `Zeilennummern ${settings.lineNumbers ? "aus" : "an"}`, group: "Einstellungen", icon: <Icon.settings />, run: () => setSettings({ lineNumbers: !settings.lineNumbers }) },
-      { id: "mathquote", label: `Text in Formeln automatisch quoten ${settings.mathQuote ? "aus" : "an"}`, group: "Einstellungen", icon: <Icon.settings />, run: () => setSettings({ mathQuote: !settings.mathQuote }) },
-      { id: "wrap", label: `Zeilenumbruch ${settings.wrap ? "aus" : "an"}`, group: "Einstellungen", icon: <Icon.settings />, run: () => setSettings({ wrap: !settings.wrap }) },
-      {
-        id: "stil",
-        label: "Stil aktualisieren …",
-        detail: "stil.typ und Vorlagen",
-        group: "Aktionen",
-        icon: <Icon.bolt />,
-        run: () => void refreshStil().then(() => setStilOpen(true)),
-      },
-      {
-        id: "history",
-        label: "Verlauf dieser Datei",
-        detail: "frühere Stände",
-        group: "Aktionen",
-        icon: <Icon.book />,
-        run: () => currentRef.current && setHistoryOpen(true),
-      },
-      { id: "sidebar", label: `Seitenleiste ${settings.sidebar ? "ausblenden" : "einblenden"}`, detail: kbd("⌘\\"), group: "Einstellungen", icon: <Icon.sidebar />, run: () => setSettings({ sidebar: !settings.sidebar }) },
-      { id: "font+", label: "Editor-Schrift größer", detail: `${settings.fontSize}px`, group: "Einstellungen", icon: <Icon.zoomIn />, run: () => setSettings({ fontSize: Math.min(24, settings.fontSize + 1) }) },
-      { id: "font-", label: "Editor-Schrift kleiner", detail: `${settings.fontSize}px`, group: "Einstellungen", icon: <Icon.zoomOut />, run: () => setSettings({ fontSize: Math.max(10, settings.fontSize - 1) }) },
-      { id: "theme-system", label: "Design: wie System", keywords: "theme dark light", group: "Einstellungen", icon: <Icon.settings />, run: () => setSettings({ theme: "system" }) },
-      { id: "theme-light", label: "Design: hell", keywords: "theme light", group: "Einstellungen", icon: <Icon.settings />, run: () => setSettings({ theme: "light" }) },
-      { id: "theme-dark", label: "Design: dunkel", keywords: "theme dark", group: "Einstellungen", icon: <Icon.settings />, run: () => setSettings({ theme: "dark" }) },
-    ];
-    return [...actions, ...insert, ...fileItems, ...prefs];
-  }, [files, main, palette, solutions, settings, exportPdf, toggleSolutions, openFile, insertImages, onClose, project.root, openTableEditor, openMatrixEditor, openSearch, formatDocument]);
+      zoom: (f) => zoom(f === "fit" ? 1 : settings.zoom * f),
+      save: () => void flushSave(),
+      goHome: onClose,
+    },
+    fileCommands,
+  );
+  const commandsRef = useRef(commands);
+  commandsRef.current = commands;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => void handleKey(commandsRef.current, e);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+  const title = (id: string, label: string) => withKeys(commands, id, label);
 
   const dynamicItems = useCallback((q: string): PaletteItem[] => {
     const m = q.match(/^(?:tab(?:elle)?|tbl|mat(?:rix)?)?\s*(\d{1,2})\s*[x×*]\s*(\d{1,2})$/i);
@@ -1264,7 +1077,7 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
         <button className="icon-btn" title="Projektübersicht" onClick={onClose}>
           <Icon.home />
         </button>
-        <button className={"icon-btn" + (settings.sidebar ? " on" : "")} title={kbd("Seitenleiste (⌘\\)")} onClick={() => setSettings({ sidebar: !settings.sidebar })}>
+        <button className={"icon-btn" + (settings.sidebar ? " on" : "")} title={title("sidebar", "Seitenleiste")} onClick={() => setSettings({ sidebar: !settings.sidebar })}>
           <Icon.sidebar />
         </button>
         <div className="crumbs" data-tauri-drag-region>
@@ -1278,34 +1091,34 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
           {dirty && <span className="dirty" title="Ungespeicherte Änderungen" />}
         </div>
         <div className="spacer" data-tauri-drag-region />
-        <button className="icon-btn" title={kbd("Literatur & Zitate (⌘⇧B)")} onClick={() => setLitOpen(true)}>
+        <button className="icon-btn" title={title("literature", "Literatur & Zitate")} onClick={() => setLitOpen(true)}>
           <Icon.book />
         </button>
-        <button className="icon-btn" title={kbd("Grafik einfügen (⌘⇧G)")} onClick={() => setGraphicsOpen(true)}>
+        <button className="icon-btn" title={title("graphics", "Grafik einfügen")} onClick={() => setGraphicsOpen(true)}>
           <Icon.chart />
         </button>
-        <button className="icon-btn" title={kbd("Symbole (⌘⇧S)")} onClick={() => setSymbolsOpen(true)}>
+        <button className="icon-btn" title={title("symbols", "Symbole")} onClick={() => setSymbolsOpen(true)}>
           <Icon.math />
         </button>
-        <button className="icon-btn" title={kbd("Tabellen-Editor (⌘T) – in Formeln: Matrix-Editor")} onClick={openGridEditor}>
+        <button className="icon-btn" title={title("grid-editor", "Tabellen-Editor, in Formeln Matrix-Editor")} onClick={openGridEditor}>
           <Icon.table />
         </button>
         <button className="btn ghost" onClick={() => setPalette("all")} title="Befehle, Bausteine, Dateien">
-          <Icon.search /> <span style={{ color: "var(--muted)" }}>Befehle</span> <kbd>{kbd("⌘K")}</kbd>
+          <Icon.search /> <span style={{ color: "var(--muted)" }}>Befehle</span> <kbd>{keyLabel("mod+k")}</kbd>
         </button>
         <div className="divider" />
-        <button className={"toggle" + (solutions ? " on" : "")} onClick={toggleSolutions} title={kbd("Lösungen ein-/ausblenden (⌘⇧L)")}>
+        <button className={"toggle" + (solutions ? " on" : "")} onClick={toggleSolutions} title={title("solutions", "Lösungen ein-/ausblenden")}>
           <span className="knob" /> Lösungen
         </button>
         <div className="divider" />
         <div className="group">
-          <button className="icon-btn" title={kbd("Verkleinern (⌘−)")} onClick={() => zoom(settings.zoom / 1.15)}>
+          <button className="icon-btn" title={title("zoom-out", "Verkleinern")} onClick={() => zoom(settings.zoom / 1.15)}>
             <Icon.zoomOut />
           </button>
-          <button className="btn ghost zoom-label" style={{ padding: 0 }} title={kbd("An Breite anpassen (⌘0)")} onClick={() => zoom(1)}>
+          <button className="btn ghost zoom-label" style={{ padding: 0 }} title={title("zoom-fit", "An Breite anpassen")} onClick={() => zoom(1)}>
             {Math.round(settings.zoom * 100)}%
           </button>
-          <button className="icon-btn" title={kbd("Vergrößern (⌘+)")} onClick={() => zoom(settings.zoom * 1.15)}>
+          <button className="icon-btn" title={title("zoom-in", "Vergrößern")} onClick={() => zoom(settings.zoom * 1.15)}>
             <Icon.zoomIn />
           </button>
         </div>
@@ -1319,8 +1132,8 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
               x: r.right - 240,
               y: r.bottom + 6,
               items: [
-                { label: "PDF exportieren", detail: kbd("⌘E"), run: () => exportPdf(false) },
-                { label: "Aufgaben + Lösungen exportieren", detail: kbd("⌘⇧E"), run: () => exportPdf(true) },
+                { label: "PDF exportieren", detail: keyLabel("mod+e"), run: () => exportPdf(false) },
+                { label: "Aufgaben + Lösungen exportieren", detail: keyLabel("mod+shift+e"), run: () => exportPdf(true) },
                 "sep",
                 { label: "Ordner „out“ im Finder", run: () => revealItemInDir(project.root + "/out") },
               ],
@@ -1485,7 +1298,7 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
         <span className="grow" />
         <button
           className="item spell-item"
-          title={kbd("Rechtschreibung: Sprache wählen (⌥⌘L wechselt)")}
+          title={`Rechtschreibung: Sprache wählen (${keyLabel("mod+alt+l")} wechselt)`}
           onClick={(e) => {
             e.stopPropagation();
             const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
@@ -1517,7 +1330,7 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
 
       {palette && (
         <Palette
-          items={paletteItems}
+          items={paletteItems(palette === "files" ? fileCommands : commands)}
           dynamic={palette === "all" ? dynamicItems : undefined}
           placeholder={palette === "files" ? "Datei öffnen …" : "Befehl, Baustein oder Datei … (z. B. „tabelle 3x4“)"}
           onClose={() => {
