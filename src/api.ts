@@ -107,7 +107,7 @@ export const api = {
   modeAt: (text: string, offset: number) => invoke<"markup" | "math" | "code">("mode_at", { text, offset }),
   renderSnippet: (code: string, key?: string) => invoke<string>("render_snippet", { code, key }),
   spellcheck: (text: string, mode: string, allowed: string[]) =>
-    invoke<{ issues: SpellIssue[]; dominant: string | null }>("spellcheck", { text, mode, allowed }),
+    invoke<{ issues: SpellIssue[]; dominant: string | null; pending: boolean }>("spellcheck", { text, mode, allowed }),
   learnWord: (word: string) => invoke<void>("learn_word", { word }),
   bibOverview: () => invoke<BibOverview>("bib_overview"),
   bibLookup: (query: string, taken: string[]) => invoke<{ bibtex: string; entry: BibEntry }>("bib_lookup", { query, taken }),

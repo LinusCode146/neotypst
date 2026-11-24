@@ -55,6 +55,11 @@ export function useSpell({
         const issues = r.issues.filter((i) => !ignoredWords.current.has(i.word.toLowerCase()));
         editor.current?.setSpelling(issues);
         setSpellInfo({ count: issues.length, dominant: r.dominant });
+        // Suggestions for some words are still being computed.
+        if (r.pending) {
+          window.clearTimeout(spellTimer.current);
+          spellTimer.current = window.setTimeout(runSpell, 200);
+        }
       })
       .catch(() => {});
   }, []);
@@ -75,7 +80,7 @@ export function useSpell({
     async (action: "learn" | "project" | "ignore", word: string) => {
       if (action === "learn") {
         await api.learnWord(word).catch(() => {});
-        showToast({ text: `„${word}“ wurde zum macOS-Wörterbuch hinzugefügt` });
+        showToast({ text: `„${word}“ wurde zum Wörterbuch hinzugefügt` });
       } else if (action === "project") {
         projectWords.current = [...new Set([...projectWords.current, word])].sort((a, b) => a.localeCompare(b));
         await api.writeFile(".neotypst-woerter.txt", projectWords.current.join("\n") + "\n").catch(() => {});

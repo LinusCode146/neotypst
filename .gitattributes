@@ -2,3 +2,6 @@
 # bettet sie ein und erkennt ältere Fassungen an ihren Prüfsummen.
 src-tauri/templates/** text eol=lf
 *.typ text eol=lf
+
+# Wörterbücher unverändert ausliefern (Hunspell liest sie byteweise).
+src-tauri/dictionaries/** -text
