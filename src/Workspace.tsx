@@ -38,6 +38,7 @@ import { SearchPanel } from "./SearchPanel";
 import { beforeRestart } from "./updater";
 import { kbd } from "./platform";
 import { outlineOf, type Heading } from "./outline";
+import { FileViewer, type ViewKind } from "./FileViewer";
 
 
 const IMAGE_EXT = /\.(png|jpe?g|gif|svg|webp)$/i;
@@ -51,6 +52,18 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
   const [files, setFiles] = useState<FileEntry[]>(project.files);
   const [main, setMain] = useState(project.main);
   const [current, setCurrent] = useState<string | null>(null);
+  /** PDF oder Bild, das statt Editor und Vorschau angezeigt wird. */
+  const [viewing, setViewing] = useState<{ rel: string; kind: ViewKind } | null>(null);
+  const [viewZoom, setViewZoom] = useState(1);
+  const view = useCallback((rel: string, kind: ViewKind) => {
+    setViewing({ rel, kind });
+    setViewZoom(1);
+  }, []);
+  const closeViewer = useCallback(() => {
+    setViewing(null);
+    requestAnimationFrame(() => editor.current?.focus());
+  }, []);
+
   // Der Text lebt im Editor. Gliederung und Suche bekommen ihn erst nach einer
   // kurzen Tipp-Pause, damit nicht jeder Tastendruck die ganze Ansicht neu rendert.
   const [outline, setOutline] = useState<Heading[]>([]);
@@ -62,7 +75,6 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
     setTextVersion((v) => v + 1);
   }, []);
   const [marker, setMarker] = useState<Marker | null>(null);
-  const [solutions, setSolutions] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [palette, setPalette] = useState<null | "all" | "files">(null);
   const [showProblems, setShowProblems] = useState(false);
@@ -246,6 +258,7 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
 
   const openFile = useCallback(
     async (rel: string, reveal?: number) => {
+      setViewing(null);
       if (rel === currentRef.current) {
         if (reveal != null) editor.current?.reveal(reveal);
         return;
@@ -347,13 +360,6 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
 
   // ---------- Actions ----------
 
-  const toggleSolutions = useCallback(async () => {
-    const next = !solutions;
-    setSolutions(next);
-    await api.setSolutions(next);
-    requestCompile();
-  }, [solutions, requestCompile]);
-
   const exportPdf = useCallback(
     async (both: boolean) => {
       await flushSave();
@@ -382,7 +388,7 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
   /** Eine PDF an einen frei gewählten Ort, vorgeschlagen wird der Downloads-Ordner. */
   const exportPdfAs = useCallback(async () => {
     const stem = (main.split("/").pop() ?? "dokument").replace(/\.typ$/, "");
-    const name = `${stem}${solutions ? "-loesung" : ""}.pdf`;
+    const name = `${stem}.pdf`;
     let defaultPath = name;
     try {
       defaultPath = await join(await downloadDir(), name);
@@ -408,7 +414,7 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
     } catch (e) {
       showToast({ text: String(e), kind: "error" }, 6000);
     }
-  }, [main, solutions, flushSave, showToast]);
+  }, [main, flushSave, showToast]);
 
 
   const tools = useEditorTools({ editor, currentRef, main, refreshFiles, requestCompile, showToast });
@@ -420,8 +426,13 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
 
   const { treeActions } = useFileActions({
     project, files, main, setMain, editor, currentRef, setCurrent, openFile, flushSave, refreshFiles,
-    requestCompile, svgCache, showToast, setMenu, insertImages, pathFromCurrent,
+    requestCompile, svgCache, showToast, setMenu, insertImages, pathFromCurrent, view,
   });
+
+  // Gelöschte oder umbenannte Datei: Betrachter schließen.
+  useEffect(() => {
+    if (viewing && !files.some((f) => f.path === viewing.rel)) setViewing(null);
+  }, [files, viewing]);
 
   // Drag & drop of files from Finder.
   useEffect(() => {
@@ -466,7 +477,10 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
     return () => void beforeRestart.delete(flushSave);
   }, [flushSave]);
 
-  const zoom = (z: number) => setSettings({ zoom: Math.min(4, Math.max(0.25, Math.round(z * 1000) / 1000)) });
+  const clampZoom = (z: number) => Math.min(4, Math.max(0.25, Math.round(z * 1000) / 1000));
+  /** Vorschau-Zoom des Dokuments; bei offenem Betrachter der Zoom von PDF oder Bild. */
+  const zoom = (z: number) => (viewing ? setViewZoom(clampZoom(z)) : setSettings({ zoom: clampZoom(z) }));
+  const shownZoom = viewing ? viewZoom : settings.zoom;
 
   // ---------- Splitter ----------
 
@@ -508,7 +522,7 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
           detail: f.path === main ? "Hauptdatei" : undefined,
           run: () => {
             if (f.kind === "typ" || f.kind === "text") openFile(f.path);
-            else if (f.kind === "image") insertImages([f.path]);
+            else if (f.kind === "image" || f.kind === "pdf") setViewing({ rel: f.path, kind: f.kind });
             else api.absolutePath(f.path).then(openPath);
           },
         })),
@@ -518,13 +532,11 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
   const commands = buildCommands(
     {
       settings,
-      solutions,
       project,
       main,
       togglePalette: (kind) => setPalette((p) => (p ? null : kind)),
       exportPdf: (both) => void exportPdf(both),
       exportPdfAs: () => void exportPdfAs(),
-      toggleSolutions: () => void toggleSolutions(),
       editorCommand: (name) => editor.current?.command(name),
       insertSnippet: (body) => editor.current?.insertSnippet(body),
       openLiterature: () => setLitOpen(true),
@@ -548,7 +560,7 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
         setSettings({ spell: next });
         showToast({ text: `Rechtschreibung: ${spellLabel(next)}` }, 1500);
       },
-      zoom: (f) => zoom(f === "fit" ? 1 : settings.zoom * f),
+      zoom: (f) => zoom(f === "fit" ? 1 : shownZoom * f),
       save: () => void flushSave(),
       goHome: onClose,
     },
@@ -603,8 +615,7 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
         current={current}
         dirty={dirty}
         sidebar={settings.sidebar}
-        solutions={solutions}
-        zoom={settings.zoom}
+        zoom={shownZoom}
         title={title}
         onHome={onClose}
         onToggleSidebar={() => setSettings({ sidebar: !settings.sidebar })}
@@ -613,7 +624,6 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
         onSymbols={() => setSymbolsOpen(true)}
         onGrid={() => void openGridEditor()}
         onPalette={() => setPalette("all")}
-        onToggleSolutions={() => void toggleSolutions()}
         onZoom={zoom}
         onExportMenu={(r) =>
           setMenu({
@@ -653,13 +663,24 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
                 }}
               />
             ) : (
-              <FileTree projectRoot={project.root} files={files} current={current} main={main} actions={treeActions} request={treeRequest} />
+              <FileTree projectRoot={project.root} files={files} current={viewing?.rel ?? current} main={main} actions={treeActions} request={treeRequest} />
             )}
             {!searchOpen && <Outline items={outline} onReveal={(line) => editor.current?.revealLine(line)} />}
           </aside>
         )}
 
-        <section className="editor-pane" style={{ flexBasis: `${split * 100}%` }}>
+        {viewing && (
+          <FileViewer
+            rel={viewing.rel}
+            kind={viewing.kind}
+            zoom={viewZoom}
+            onZoom={zoom}
+            onClose={closeViewer}
+            onOpenExternal={() => void api.absolutePath(viewing.rel).then(openPath)}
+          />
+        )}
+
+        <section className="editor-pane" style={{ flexBasis: `${split * 100}%`, display: viewing ? "none" : undefined }}>
           <EditorNotices
             stil={stil}
             diags={diags}
@@ -708,9 +729,9 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
           )}
         </section>
 
-        <div className={"splitter" + (dragging ? " dragging" : "")} onMouseDown={startDrag} />
+        <div className={"splitter" + (dragging ? " dragging" : "")} onMouseDown={startDrag} hidden={!!viewing} />
 
-        <div style={{ flexBasis: `${(1 - split) * 100}%`, display: "flex", minWidth: 260, flexGrow: 1, flexShrink: 1 }}>
+        <div style={{ flexBasis: `${(1 - split) * 100}%`, display: viewing ? "none" : "flex", minWidth: 260, flexGrow: 1, flexShrink: 1 }}>
           <Preview
             ref={preview}
             pages={pages}

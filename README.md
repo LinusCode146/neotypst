@@ -91,7 +91,6 @@ Erkannt werden ältere Fassungen an ihren Prüfsummen in `src-tauri/templates/_s
 | ⌘⇧S | Symbolpalette: griechische Buchstaben, Pfeile, Relationen, Mengen, Strukturen wie Wurzel oder Vektorpfeil |
 | ⌘T | Tabellen-Editor (Cursor in einer Tabelle → bearbeiten, sonst neue Tabelle); in einer Formel der Matrix-Editor |
 | ⌘E / ⌘⇧E | PDF exportieren / Aufgaben + Lösungen exportieren (nach `out/`; „Speichern unter …“ im Export-Menü schlägt den Downloads-Ordner vor) |
-| ⌘⇧L | Lösungen ein-/ausblenden |
 | ⌘S | Speichern (sonst automatisch) |
 | ⌘J | Cursorposition in der Vorschau zeigen |
 | ⌘B / ⌘I | fett / kursiv |
@@ -243,19 +242,23 @@ Steht der Cursor in einer Formel, öffnet ⌘T statt des Tabellen-Editors den Ma
 - **Matrix oder Vektor** (`vec`), **Einheitsmatrix** per Knopf bei quadratischen Matrizen.
 - Eine **Vorschau** im Dialog zeigt das Ergebnis, gesetzt von Typst. Mit „Mehrzeilig im Code“ werden die Zeilen untereinander und die Spalten bündig geschrieben.
 
-## Lösungen (⌘⇧L)
+## Lösungen
 
-Der Schalter „Lösungen“ oben gibt dem Dokument `sys.inputs.loesungen` mit (`"true"` oder `"false"`). Die Arbeitsblatt-Vorlage reagiert darauf:
+Der Export „Aufgaben + Lösungen“ (⌘⇧E) erzeugt `main.pdf` und `main-loesung.pdf`. Für die zweite Datei bekommt das Dokument `sys.inputs.loesungen` mit dem Wert `"true"`. Die Arbeitsblatt-Vorlage reagiert darauf:
 - `#aufgabe(punkte: 2)[Aufgabe][Lösung]` zeigt den zweiten Block als Lösungskasten
 - `#loesung[…]` wird sichtbar, `#platz(4cm)` (Rechenplatz) fällt weg
 - im Kopf steht „LÖSUNG“
 
-Beim Export „Aufgaben + Lösungen“ (⌘⇧E) entstehen `main.pdf` und `main-loesung.pdf`. In eigenen Dokumenten nutzt du den Schalter so:
+In eigenen Dokumenten:
 
 ```typst
 #let loesungen = sys.inputs.at("loesungen", default: "false") == "true"
 #if loesungen [Musterlösung: …]
 ```
+
+## Betrachter für PDFs und Bilder
+
+Ein Klick auf ein PDF oder Bild (PNG, JPG, GIF, WebP, SVG) im Dateibaum zeigt es anstelle von Editor und Vorschau. Zoomen geht wie in der Vorschau: mit den Knöpfen oben, ⌘+ / ⌘− / ⌘0 oder mit zwei Fingern. Esc oder „Schließen“ führt zurück zum Editor.
 
 ## Updates
 
