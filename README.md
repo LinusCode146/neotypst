@@ -188,14 +188,16 @@ Die Essay-Vorlage nutzt nur die Grundschrift: Deckblatt mit Fragestellung und An
 
 ## Rechtschreibung
 
-Geprüft wird nur Fließtext. Code, Formeln, Codeblöcke, Labels, Links und Strings erkennt Typsts Parser und lässt sie aus. Die Prüfung übernimmt die macOS-Rechtschreibprüfung, dein persönliches macOS-Wörterbuch gilt also mit.
+Geprüft wird nur Fließtext. Code, Formeln, Codeblöcke, Labels, Links und Strings erkennt Typsts Parser und lässt sie aus. Die Prüfung nutzt mitgelieferte Hunspell-Wörterbücher (Deutsch „frami“, US-Englisch) und funktioniert deshalb auf macOS und Windows gleich und ohne Internet. Das deutsche Wörterbuch kennt zusammengesetzte Wörter wie „Landesabitur“ oder „Hashfunktion“. Unter macOS zählt zusätzlich das System-Wörterbuch: Was macOS kennt (auch Wörter, die du dort gelernt hast), wird nicht markiert.
+
+Nicht geprüft werden einzelne Buchstaben, Wörter mit Ziffern, Abkürzungen in Großbuchstaben (HTML, BE) und Namen mit Großbuchstaben im Wort (JavaScript).
 
 **Sprache** (Statusleiste unten rechts oder ⌥⌘L):
 - **Automatisch:** Die Sprache wird pro Absatz erkannt. Überschriften übernehmen die Sprache des folgenden Absatzes. `#set text(lang: "en")` und `#text(lang: "en")[…]` im Dokument haben Vorrang. So bleibt ein gemischtes Dokument sauber.
 - **Deutsch / Englisch:** prüft alles in dieser Sprache.
 - **Aus**
 
-Beim Hover über ein markiertes Wort gibt es Vorschläge sowie **Zum Wörterbuch** (macOS, gilt überall), **Nur im Projekt** (in `.neotypst-woerter.txt` im Projektordner) und **Ignorieren** (bis zum Neustart).
+Beim Hover über ein markiertes Wort gibt es Vorschläge sowie **Zum Wörterbuch** (gilt in allen Projekten, gespeichert in `woerterbuch.txt` im App-Datenordner: `~/Library/Application Support/de.neotypst.editor/` bzw. `%APPDATA%\de.neotypst.editor\`), **Nur im Projekt** (in `.neotypst-woerter.txt` im Projektordner) und **Ignorieren** (bis zum Neustart).
 
 ## Text in Formeln
 
@@ -280,8 +282,14 @@ cd src-tauri && cargo test --lib  # Rust
 
 Beides läuft auch automatisch auf GitHub (`.github/workflows/ci.yml`), bei jedem Pull Request und jedem Push auf main, unter macOS und Windows. `scripts/release.sh` veröffentlicht nur einen Stand, der auf `origin/main` liegt und für den diese CI grün ist.
 
-Die Tests prüfen unter anderem, dass jede Vorlage, jeder Grafik-Baustein, jeder Zitierstil und jede erzeugte Tabelle fehlerfrei kompiliert. Außerdem testen sie Autovervollständigung, Klick-Sprung, das Einlesen von Tabellen und Matrizen, die Erkennung von Text in Formeln, das Formatieren, die Namen eingefügter Bilder und die Rechtschreibprüfung (mit dem echten macOS-Wörterbuch). Tests, die ins Netz gehen, sind mit `#[ignore]` markiert (`cargo test --lib -- --ignored`).
+Die Tests prüfen unter anderem, dass jede Vorlage, jeder Grafik-Baustein, jeder Zitierstil und jede erzeugte Tabelle fehlerfrei kompiliert. Außerdem testen sie Autovervollständigung, Klick-Sprung, das Einlesen von Tabellen und Matrizen, die Erkennung von Text in Formeln, das Formatieren, die Namen eingefügter Bilder und die Rechtschreibprüfung (mit den mitgelieferten Wörterbüchern, auf macOS zusätzlich mit dem System-Wörterbuch). Tests, die ins Netz gehen, sind mit `#[ignore]` markiert (`cargo test --lib -- --ignored`).
 
 ## Lizenz
 
 [MIT](LICENSE): Du darfst den Code frei nutzen, verändern und weitergeben, auch kommerziell.
+
+Ausnahme sind die Wörterbücher in `src-tauri/dictionaries/`, die als eigene Dateien neben dem Programm ausgeliefert werden:
+- `de_DE_frami` (aus [igerman98](https://www.j3e.de/ispell/igerman98/) von Björn Jacke, erweitert von Franz Michael Baumann, bezogen über [LibreOffice/dictionaries](https://github.com/LibreOffice/dictionaries)): GNU GPL Version 2 oder 3 (`COPYING_GPLv2`, `COPYING_GPLv3`). Für NeoTypst nur von ISO-8859-1 nach UTF-8 umkodiert.
+- `en_US` (aus [SCOWL](http://wordlist.aspell.net/), ebenfalls über LibreOffice): freie BSD-artige Lizenz, siehe `README_en_US.txt`.
+
+Das Programm lädt die Wörterbücher nur als Daten, der MIT-lizenzierte Code bleibt davon unberührt.
