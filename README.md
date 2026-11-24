@@ -48,6 +48,13 @@ Projekt/
 └── out/            exportierte PDFs
 ```
 
+### Speichern und Verlauf
+
+- NeoTypst speichert automatisch kurz nach dem Tippen und beim Wechsel in eine andere App. Geschrieben wird erst in eine Nachbardatei, die dann umbenannt wird. Eine Datei ist also nie halb gespeichert, auch nicht bei einem Absturz.
+- **Änderungen von außen:** Ändert ein anderes Programm (Editor, Git, Finder) die offene Datei, lädt NeoTypst sie beim Zurückwechseln neu. Hast du selbst noch ungespeicherte Änderungen, fragt eine Karte über dem Editor: „Neu laden“ oder „Meine Version behalten“. Die verworfene Fassung landet in beiden Fällen im Verlauf.
+- **Verlauf** (⌘K → „Verlauf dieser Datei“): frühere Stände mit Uhrzeit und einem Vergleich zum jetzigen Text. Gesichert wird beim Speichern höchstens alle 2 Minuten, sofort aber, wenn viel Text auf einmal verschwindet, und vor dem Neuladen, Überschreiben oder Wiederherstellen. „Wiederherstellen“ ist eine normale Bearbeitung, ⌘Z macht sie rückgängig.
+- Der Verlauf liegt im Projekt unter `.neotypst/verlauf/` und zieht mit dem Projekt um. Die letzten 24 Stunden bleiben vollständig, danach ein Stand pro Stunde (7 Tage) und pro Tag (30 Tage), höchstens 20 MB pro Projekt.
+
 ### Dateibaum
 
 - **Rechtsklick** auf eine Datei: Öffnen, als Hauptdatei festlegen, als Abbildung einfügen, Umbenennen, Duplizieren, Pfad kopieren (so, wie er in der aktuellen Datei für `#image`/`#include` geschrieben wird), im Finder zeigen, in den Papierkorb.
