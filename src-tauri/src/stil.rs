@@ -18,10 +18,11 @@ const VERSIONEN: &str = include_str!("../templates/_stil/versionen.txt");
 /// Version des lokalen Pakets `@local/stil`, das die App bereitstellt.
 pub const PAKET_VERSION: &str = "0.1.0";
 
-/// FNV-1a 64, wie in scripts/stil-versionen.py.
+/// FNV-1a 64, wie in scripts/stil-versionen.py. Zeilenenden zählen nicht:
+/// `\r` wird übersprungen, damit Windows-Kopien (CRLF) gleich gelten.
 pub fn stil_hash(data: &[u8]) -> String {
     let mut h: u64 = 0xcbf29ce484222325;
-    for b in data {
+    for b in data.iter().filter(|b| **b != b'\r') {
         h ^= *b as u64;
         h = h.wrapping_mul(0x100000001b3);
     }
@@ -55,7 +56,7 @@ fn status_in(root: &Path, versionen: &str) -> Vec<StilDatei> {
         .into_iter()
         .filter_map(|(pfad, neu)| {
             let alt = fs::read(root.join(pfad)).ok()?;
-            let status = if alt == neu.as_bytes() {
+            let status = if stil_hash(&alt) == stil_hash(neu.as_bytes()) {
                 "aktuell"
             } else if bekannt_in(versionen, pfad, &stil_hash(&alt)) {
                 "veraltet"
@@ -83,7 +84,7 @@ pub fn aktualisieren(root: &Path, pfade: &[String]) -> Result<Vec<String>, Strin
     for pfad in pfade {
         let neu = mitgeliefert(pfad)?;
         let alt = fs::read_to_string(root.join(pfad)).unwrap_or_default();
-        if alt == neu {
+        if stil_hash(alt.as_bytes()) == stil_hash(neu.as_bytes()) {
             continue;
         }
         if !alt.is_empty() {
@@ -156,6 +157,8 @@ mod tests {
         // FNV-1a 64 Referenzwerte.
         assert_eq!(stil_hash(b""), "cbf29ce484222325");
         assert_eq!(stil_hash(b"a"), "af63dc4c8601ec8c");
+        // CRLF und LF ergeben dieselbe Prüfsumme.
+        assert_eq!(stil_hash(b"a\r\nb\r\n"), stil_hash(b"a\nb\n"));
     }
 
     #[test]

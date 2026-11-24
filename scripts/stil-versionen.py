@@ -4,7 +4,7 @@ Fassungen von stil.typ und den Vorlagen-Dateien, die je committet wurden.
 
 NeoTypst erkennt daran, ob die Kopie in einem Projekt eine unveränderte
 ältere Fassung ist (dann darf sie ersetzt werden) oder von Hand angepasst.
-Prüfsumme: FNV-1a 64 über die Bytes, wie stil_hash() in templates.rs.
+Prüfsumme: FNV-1a 64 über die Bytes ohne \r, wie stil_hash() in stil.rs.
 
     scripts/stil-versionen.py          neu schreiben
     scripts/stil-versionen.py --check  Fehler, wenn die Datei veraltet ist
@@ -20,8 +20,9 @@ for name in ["arbeitsblatt", "hausaufgabe", "wettbewerb", "dokumentation", "essa
 
 
 def fnv1a(data: bytes) -> str:
+    # Zeilenenden zählen nicht: \r wird übersprungen (Windows-Kopien mit CRLF).
     h = 0xCBF29CE484222325
-    for b in data:
+    for b in data.replace(b"\r", b""):
         h ^= b
         h = (h * 0x100000001B3) & 0xFFFFFFFFFFFFFFFF
     return f"{h:016x}"
