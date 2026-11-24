@@ -150,7 +150,7 @@ const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
   spellcheck: ({ text }) => {
     const t = text as string;
     const i = t.indexOf("beschleunigter");
-    return { issues: i >= 0 ? [{ from: i, to: i + 14, word: "beschleunigter", lang: "de", suggestions: ["beschleunigte", "beschleunigten"] }] : [], dominant: "de" };
+    return { issues: i >= 0 ? [{ from: i, to: i + 14, word: "beschleunigter", lang: "de", suggestions: ["beschleunigte", "beschleunigten"] }] : [], dominant: "de", pending: false };
   },
   learn_word: () => null,
   bib_overview: () => ({
