@@ -20,6 +20,7 @@ export type CommandContext = {
   main: string;
   togglePalette(kind: "all" | "files"): void;
   exportPdf(both: boolean): void;
+  exportPdfAs(): void;
   toggleSolutions(): void;
   editorCommand(name: "convertTable"): void;
   insertSnippet(body: string): void;
@@ -63,6 +64,14 @@ export function buildCommands(ctx: CommandContext, files: Command[]): Command[] 
       group: "Aktionen",
       icon: <Icon.export />,
       run: () => ctx.exportPdf(true),
+    },
+    {
+      id: "export-as",
+      label: "PDF speichern unter …",
+      keywords: "export downloads ordner speichern",
+      group: "Aktionen",
+      icon: <Icon.export />,
+      run: ctx.exportPdfAs,
     },
     {
       id: "solutions",

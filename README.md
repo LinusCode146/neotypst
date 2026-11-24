@@ -90,7 +90,7 @@ Erkannt werden ältere Fassungen an ihren Prüfsummen in `src-tauri/templates/_s
 | ⌘⇧G | Grafik einfügen (Koordinatensystem, Plots, Kräfte, Stromkreis, Flussdiagramm …) |
 | ⌘⇧S | Symbolpalette: griechische Buchstaben, Pfeile, Relationen, Mengen, Strukturen wie Wurzel oder Vektorpfeil |
 | ⌘T | Tabellen-Editor (Cursor in einer Tabelle → bearbeiten, sonst neue Tabelle); in einer Formel der Matrix-Editor |
-| ⌘E / ⌘⇧E | PDF exportieren / Aufgaben + Lösungen exportieren |
+| ⌘E / ⌘⇧E | PDF exportieren / Aufgaben + Lösungen exportieren (nach `out/`; „Speichern unter …“ im Export-Menü schlägt den Downloads-Ordner vor) |
 | ⌘⇧L | Lösungen ein-/ausblenden |
 | ⌘S | Speichern (sonst automatisch) |
 | ⌘J | Cursorposition in der Vorschau zeigen |

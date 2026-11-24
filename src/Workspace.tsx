@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { openPath, openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
+import { save } from "@tauri-apps/plugin-dialog";
+import { downloadDir, join } from "@tauri-apps/api/path";
 
 import { api, isConflict, type FileEntry, type HistoryEntry, type OpenedProject, type StilDatei } from "./api";
 import { StilDialog } from "./StilDialog";
@@ -377,6 +379,37 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
     [flushSave, refreshFiles, showToast],
   );
 
+  /** Eine PDF an einen frei gewählten Ort, vorgeschlagen wird der Downloads-Ordner. */
+  const exportPdfAs = useCallback(async () => {
+    const stem = (main.split("/").pop() ?? "dokument").replace(/\.typ$/, "");
+    const name = `${stem}${solutions ? "-loesung" : ""}.pdf`;
+    let defaultPath = name;
+    try {
+      defaultPath = await join(await downloadDir(), name);
+    } catch {
+      /* ohne Downloads-Ordner: nur der Dateiname */
+    }
+    const target = await save({ title: "PDF speichern unter", defaultPath, filters: [{ name: "PDF", extensions: ["pdf"] }] });
+    if (!target) return;
+    await flushSave();
+    showToast({ text: "Exportiere …" }, 10000);
+    try {
+      const [path] = await api.exportPdf(false, target);
+      showToast(
+        {
+          text: `Gespeichert: ${path.split(/[\\/]/).pop()}`,
+          actions: [
+            { label: "Öffnen", run: () => openPath(path) },
+            { label: "Im Ordner zeigen", run: () => revealItemInDir(path) },
+          ],
+        },
+        7000,
+      );
+    } catch (e) {
+      showToast({ text: String(e), kind: "error" }, 6000);
+    }
+  }, [main, solutions, flushSave, showToast]);
+
 
   const tools = useEditorTools({ editor, currentRef, main, refreshFiles, requestCompile, showToast });
   const {
@@ -490,6 +523,7 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
       main,
       togglePalette: (kind) => setPalette((p) => (p ? null : kind)),
       exportPdf: (both) => void exportPdf(both),
+      exportPdfAs: () => void exportPdfAs(),
       toggleSolutions: () => void toggleSolutions(),
       editorCommand: (name) => editor.current?.command(name),
       insertSnippet: (body) => editor.current?.insertSnippet(body),
@@ -588,6 +622,7 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
             items: [
               { label: "PDF exportieren", detail: keyLabel("mod+e"), run: () => exportPdf(false) },
               { label: "Aufgaben + Lösungen exportieren", detail: keyLabel("mod+shift+e"), run: () => exportPdf(true) },
+              { label: "Speichern unter …", run: () => void exportPdfAs() },
               "sep",
               { label: "Ordner „out“ im Finder", run: () => revealItemInDir(project.root + "/out") },
             ],
