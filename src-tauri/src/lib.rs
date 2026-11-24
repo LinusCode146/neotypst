@@ -5,6 +5,7 @@ mod graphics;
 mod history;
 mod project;
 mod spell;
+mod stil;
 mod symbols;
 mod table;
 mod templates;
@@ -124,6 +125,43 @@ fn read_file(state: State<'_, AppState>, rel: String) -> Result<String, String> 
 #[tauri::command]
 fn write_file(state: State<'_, AppState>, rel: String, text: String, expected: Option<String>) -> Result<String, String> {
     project::save_text(&state.root()?, &rel, &text, expected.as_deref(), history::jetzt())
+}
+
+// ---------- Stil ----------
+
+#[tauri::command]
+fn stil_status(state: State<'_, AppState>) -> Result<Vec<stil::StilDatei>, String> {
+    Ok(stil::status(&state.root()?))
+}
+
+#[tauri::command]
+fn stil_bundled(path: String) -> Result<String, String> {
+    stil::mitgeliefert(&path).map(str::to_string)
+}
+
+/// Ersetzt Stil-Dateien im offenen Projekt; der Compiler vergisst seine Puffer davon.
+#[tauri::command]
+async fn stil_update(state: State<'_, AppState>, paths: Vec<String>) -> Result<Vec<String>, String> {
+    let done = stil::aktualisieren(&state.root()?, &paths)?;
+    for rel in done.clone() {
+        state.engine.run(move |e| e.drop_buffer(rel)).await?;
+    }
+    Ok(done)
+}
+
+#[tauri::command]
+fn stil_scan_all() -> Result<Vec<stil::ProjektStil>, String> {
+    stil::alle_projekte()
+}
+
+#[tauri::command]
+fn stil_update_project(path: String, paths: Vec<String>) -> Result<Vec<String>, String> {
+    let root = std::path::PathBuf::from(&path);
+    let base = project::projects_dir()?;
+    if !root.starts_with(&base) {
+        return Err("Projekt liegt nicht im Projektordner".into());
+    }
+    stil::aktualisieren(&root, &paths)
 }
 
 #[tauri::command]
@@ -386,6 +424,11 @@ pub fn run() {
             read_file,
             write_file,
             open_text,
+            stil_status,
+            stil_bundled,
+            stil_update,
+            stil_scan_all,
+            stil_update_project,
             file_hash,
             history_list,
             history_read,

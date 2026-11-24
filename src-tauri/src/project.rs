@@ -17,8 +17,8 @@ pub fn projects_dir() -> Result<PathBuf, String> {
 
 #[derive(Serialize)]
 pub struct ProjectInfo {
-    name: String,
-    path: String,
+    pub name: String,
+    pub path: String,
     modified: u64,
     files: usize,
 }

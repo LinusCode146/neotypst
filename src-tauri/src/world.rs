@@ -81,6 +81,12 @@ static PACKAGES: LazyLock<SystemPackages> = LazyLock::new(|| {
     {
         eprintln!("Mitgelieferte Pakete konnten nicht bereitgestellt werden: {e}");
     }
+    // @local/stil immer in der Fassung dieser App.
+    if let Some(data) = FsPackages::system_data()
+        && let Err(e) = crate::stil::paket_bereitstellen(data.path())
+    {
+        eprintln!("@local/stil konnte nicht bereitgestellt werden: {e}");
+    }
     let agent = format!("neotypst/{}", env!("CARGO_PKG_VERSION"));
     SystemPackages::from_parts(
         FsPackages::system_data(),
