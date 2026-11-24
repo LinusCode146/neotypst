@@ -1,4 +1,4 @@
-// neotypst-stil 0.5.0
+// neotypst-stil 0.6.0
 // Lösungen für Wettbewerbe (z. B. Mathe-/Physik-Olympiade, Bundeswettbewerb),
 // aufgebaut auf stil.typ.
 
@@ -28,9 +28,12 @@
   pagebreak(weak: true)
   text(16pt, weight: "bold")[Aufgabe #nummer#if titel != none [#h(0.6em)#text(weight: "regular", titel)]]
   v(0.2em)
-  context if _akademisch() {
+  context if _linien() {
     // Wie in den Lösungsheften: Stellung zwischen zwei feinen Linien.
     block(width: 100%, inset: (y: 0.6em), stroke: (top: 0.4pt, bottom: 0.4pt), below: 1em, stellung)
+  } else if _akademisch() {
+    // Profil „schlicht“: ohne Linien.
+    block(width: 100%, below: 1em, stellung)
   } else {
     block(
       width: 100%,

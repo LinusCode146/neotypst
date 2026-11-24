@@ -1,10 +1,11 @@
-// neotypst-stil 0.5.0
+// neotypst-stil 0.6.0
 // stil – einheitlicher Stil für Arbeitsblätter, Hausaufgaben und Lab-Protokolle.
 //
 //   #import "@local/stil:0.1.0": *
 //   #show: stil                         schwarz, 12 pt
 //   #show: stil.with(akzent: rgb("#2b50c8"), groesse: 11pt)
 //   #show: stil.with(profil: "akademisch")   nach Uni- und Satznormen
+//   #show: stil.with(profil: "schlicht")     wie akademisch, ohne Linien
 //
 // Regeln und Beispiele: STIL.md im selben Ordner.
 
@@ -18,8 +19,11 @@
 // "klassisch": grauer Aufgabenkasten, 12 pt, Flattersatz.
 // "akademisch": wie Übungsblätter, Wettbewerbslösungen und Arbeiten an der Uni
 // (Blocksatz, 11 pt, Satzspiegel nach KOMA-Script, Tabellen ohne Gitter).
+// "schlicht": wie "akademisch", aber Aufgabenstellungen ohne die feinen
+// Linien darüber und darunter.
 #let _profil = state("stil-profil", ("klassisch",))
-#let _akademisch() = _profil.get().last() == "akademisch"
+#let _akademisch() = _profil.get().last() in ("akademisch", "schlicht")
+#let _linien() = _profil.get().last() == "akademisch"
 #let _aufgabe = counter("stil-aufgabe")
 #let _teil = counter("stil-teil")
 
@@ -287,6 +291,7 @@
 ///   #aufgabe[Text oder Screenshot]
 ///   #aufgabe(titel: "Geburten")[…]
 ///   #aufgabe(nr: "3.12")[…]          eigene Nummer, zählt nicht mit
+///   #aufgabe(nr: none)[…]            nur „Aufgabe“, ohne Nummer
 ///   #aufgabe(punkte: 4)[…]
 #let aufgabe(titel: none, nr: auto, punkte: none, body) = {
   if nr == auto { _aufgabe.step() }
@@ -297,14 +302,19 @@
     if _akademisch() {
       // Wie auf Uni-Übungsblättern: Kopf als Zeile, die Stellung zwischen
       // zwei feinen Linien statt auf grauem Grund (druckt und kopiert sauber).
+      // Im Profil „schlicht“ ohne Linien.
       block(width: 100%, above: 1.9em, below: 1em, breakable: true)[
         #set enum(numbering: "(a)")
         #block(below: 0.55em, sticky: true, grid(
           columns: (1fr, auto),
-          text(fill: ak, weight: "bold")[Aufgabe #nummer#if titel != none [#h(0.7em)#text(fill: black, weight: "regular", titel)]],
+          text(fill: ak, weight: "bold")[Aufgabe#if nummer != none [ #nummer]#if titel != none [#h(0.7em)#text(fill: black, weight: "regular", titel)]],
           if punkte != none [(#punkte #if punkte == 1 [Punkt] else [Punkte])],
         ))
-        #block(width: 100%, inset: (y: 0.6em), stroke: (top: 0.4pt, bottom: 0.4pt), body)
+        #if _linien() {
+          block(width: 100%, inset: (y: 0.6em), stroke: (top: 0.4pt, bottom: 0.4pt), body)
+        } else {
+          block(width: 100%, inset: (bottom: 0.6em), body)
+        }
       ]
     } else {
     block(
@@ -322,7 +332,7 @@
       // stoßen sonst an die erste Textzeile.
       #block(below: 0.85em, grid(
         columns: (1fr, auto),
-        text(fill: ak, weight: "bold")[Aufgabe #nummer#if titel != none [#h(0.6em)#text(fill: black)[#titel]]],
+        text(fill: ak, weight: "bold")[Aufgabe#if nummer != none [ #nummer]#if titel != none [#h(0.6em)#text(fill: black)[#titel]]],
         if punkte != none { text(size: 0.85em, fill: luma(90))[#punkte P.] },
       ))
       #body
@@ -378,7 +388,7 @@
 
 /// Alle Grundeinstellungen auf einmal: `#show: stil.with(…)`.
 ///
-/// - profil: "klassisch" (Standard) oder "akademisch" (siehe STIL.md, Abschnitt 6)
+/// - profil: "klassisch" (Standard), "akademisch" oder "schlicht" (siehe STIL.md, Abschnitt 6)
 /// - akzent: Farbe für Aufgabenköpfe und Teilaufgaben
 /// - kasten: Hintergrund der Aufgabenstellung (im Profil „akademisch“ keiner)
 /// - schrift: Textschrift, Standard ist die LaTeX-Schrift; z. B. "Charter" oder "Libron"
@@ -395,8 +405,9 @@
   rand: auto,
   body,
 ) = {
-  assert(profil in ("klassisch", "akademisch"), message: "stil: profil ist \"klassisch\" oder \"akademisch\"")
-  let ak = profil == "akademisch"
+  assert(profil in ("klassisch", "akademisch", "schlicht"), message: "stil: profil ist \"klassisch\", \"akademisch\" oder \"schlicht\"")
+  // „schlicht“ übernimmt alles von „akademisch“ bis auf die Linien.
+  let ak = profil in ("akademisch", "schlicht")
   let kasten = if kasten != auto { kasten } else if ak { none } else { luma(244) }
   let groesse = if groesse != auto { groesse } else if ak { 11pt } else { 12pt }
   let rand = if rand != auto { rand } else if ak { (x: 3.2cm, top: 2.7cm, bottom: 3.2cm) } else { (x: 2.2cm, y: 2cm) }
@@ -446,8 +457,8 @@
   show raw: set text(font: ("Menlo", "DejaVu Sans Mono"), size: groesse * if ak { 0.82 } else { 0.8 })
   show raw.where(block: true): set par(justify: false)
   show raw.where(block: true): if ak {
-    // Wie LaTeX-listings mit frame=lines: feine Linien statt Fläche.
-    block.with(width: 100%, inset: (x: 0pt, y: 6pt), stroke: (top: 0.4pt, bottom: 0.4pt))
+    // Akademisch und schlicht: weder Linien noch Fläche, nur Abstand.
+    block.with(width: 100%, inset: (x: 0pt, y: 6pt))
   } else {
     block.with(width: 100%, fill: luma(246), inset: 8pt, radius: 3pt)
   }
