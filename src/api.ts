@@ -37,6 +37,10 @@ export type BibEntry = { key: string; kind: string; title: string; authors: stri
 export type BibOverview = { files: string[]; target: string; call_file: string | null; style: string | null; entries: BibEntry[]; errors: string[] };
 export type SpellIssue = { from: number; to: number; word: string; lang: string; suggestions: string[] };
 
+export type HistoryEntry = { id: string; zeit: number; grund: string; bytes: number };
+/** Fehlertext von write_file, wenn die Datei von außen geändert wurde. */
+export const isConflict = (e: unknown) => String(e).startsWith("konflikt");
+
 export type CompletionKind = string | { symbol: string };
 export type Completion = { kind: CompletionKind; label: string; apply: string | null; detail: string | null };
 
@@ -54,7 +58,13 @@ export const api = {
 
   listFiles: () => invoke<FileEntry[]>("list_files"),
   readFile: (rel: string) => invoke<string>("read_file", { rel }),
-  writeFile: (rel: string, text: string) => invoke<void>("write_file", { rel, text }),
+  /** Speichert; mit `expected` nur, wenn die Datei nicht von außen geändert wurde. Gibt die neue Prüfsumme zurück. */
+  writeFile: (rel: string, text: string, expected?: string | null) => invoke<string>("write_file", { rel, text, expected }),
+  openText: (rel: string) => invoke<{ text: string; hash: string }>("open_text", { rel }),
+  fileHash: (rel: string) => invoke<string | null>("file_hash", { rel }),
+  historyList: (rel: string) => invoke<HistoryEntry[]>("history_list", { rel }),
+  historyRead: (rel: string, id: string) => invoke<string>("history_read", { rel, id }),
+  historySnapshot: (rel: string, text: string, reason: string) => invoke<boolean>("history_snapshot", { rel, text, reason }),
   createFile: (rel: string) => invoke<void>("create_file", { rel }),
   renameFile: (from: string, to: string) => invoke<void>("rename_file", { from, to }),
   createDir: (rel: string) => invoke<void>("create_dir", { rel }),
