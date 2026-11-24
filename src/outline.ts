@@ -1,6 +1,8 @@
+export type Heading = { level: number; title: string; line: number };
+
 /** Headings (`= Titel`) of the current file, ignoring raw blocks. */
-export function outlineOf(text: string) {
-  const out: { level: number; title: string; line: number }[] = [];
+export function outlineOf(text: string): Heading[] {
+  const out: Heading[] = [];
   let inRaw = false;
   text.split("\n").forEach((l, i) => {
     if (/^\s*```/.test(l)) inRaw = !inRaw;
