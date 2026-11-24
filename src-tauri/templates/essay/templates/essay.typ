@@ -1,3 +1,4 @@
+// neotypst-stil 0.5.0
 // Essay, aufgebaut auf stil.typ: Deckblatt mit Fragestellung und Angaben,
 // danach nur Text. Nichts fett, nichts farbig.
 

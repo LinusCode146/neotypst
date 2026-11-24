@@ -1,0 +1,4 @@
+# Vorlagen und Stil immer mit LF auschecken, auch unter Windows: die App
+# bettet sie ein und erkennt ältere Fassungen an ihren Prüfsummen.
+src-tauri/templates/** text eol=lf
+*.typ text eol=lf

@@ -1,3 +1,4 @@
+// neotypst-stil 0.5.0
 // stil – einheitlicher Stil für Arbeitsblätter, Hausaufgaben und Lab-Protokolle.
 //
 //   #import "@local/stil:0.1.0": *

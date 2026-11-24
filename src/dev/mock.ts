@@ -87,6 +87,17 @@ const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
   },
   history_list: () => verlauf.map((v, i) => ({ id: `${v.zeit}_${v.grund}.txt`, zeit: v.zeit, grund: v.grund, bytes: v.text.length, i })),
   history_read: ({ id }) => verlauf.find((v) => id === `${v.zeit}_${v.grund}.txt`)?.text ?? "",
+  stil_status: () => mockStil,
+  stil_bundled: () => disk.replace("#import", "// neotypst-stil 0.5.0\n#import"),
+  stil_update: ({ paths }) => {
+    mockStil = mockStil.map((d) => ((paths as string[]).includes(d.path) ? { ...d, status: "aktuell", version: "0.5.0" } : d));
+    return paths;
+  },
+  stil_scan_all: () => [
+    { name: "Physik Blatt 3 – Kinematik", path: "/mock/a", veraltet: ["templates/stil.typ", "templates/arbeitsblatt.typ"], angepasst: [] },
+    { name: "Doku Sortieralgorithmen", path: "/mock/b", veraltet: ["templates/stil.typ"], angepasst: ["templates/dokumentation.typ"] },
+  ],
+  stil_update_project: ({ paths }) => paths,
   history_snapshot: ({ text, reason }) => {
     verlauf.unshift({ zeit: Date.now(), grund: reason as string, text: text as string });
     return true;
@@ -206,6 +217,11 @@ const verlauf: { zeit: number; grund: string; text: string }[] = [
   { zeit: Date.now() - 26 * 3600_000, grund: "auto", text: "= Erster Entwurf\n" },
 ];
 (window as unknown as Record<string, unknown>).__mockAussen = (t: string) => (disk = t);
+
+let mockStil = [
+  { path: "templates/stil.typ", status: "veraltet", version: null as string | null },
+  { path: "templates/arbeitsblatt.typ", status: "angepasst", version: "0.4.0" },
+];
 
 let cb = 0;
 (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {

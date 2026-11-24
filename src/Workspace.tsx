@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { openPath, openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 
-import { api, isConflict, type BibOverview, type CompileOut, type Diag, type FileEntry, type HistoryEntry, type OpenedProject } from "./api";
+import { api, isConflict, type BibOverview, type CompileOut, type Diag, type FileEntry, type HistoryEntry, type OpenedProject, type StilDatei } from "./api";
+import { StilDialog } from "./StilDialog";
 import { HistoryDialog, zeitText } from "./HistoryDialog";
 import { LiteratureDialog } from "./LiteratureDialog";
 import { Editor, type EditorHandle } from "./editor/Editor";
@@ -105,6 +106,11 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
     setConflictState(rel);
   };
   const [historyOpen, setHistoryOpen] = useState(false);
+  /** Stil-Dateien des Projekts und ob der Hinweis dazu weggeklickt wurde. */
+  const [stil, setStil] = useState<StilDatei[]>([]);
+  const [stilOpen, setStilOpen] = useState(false);
+  const [stilLater, setStilLater] = useState(false);
+  const refreshStil = useCallback(() => api.stilStatus().then(setStil, () => setStil([])), []);
   const saveTimer = useRef<number | undefined>(undefined);
   const lastEdit = useRef(0);
   const cursorTimer = useRef<number | undefined>(undefined);
@@ -325,6 +331,28 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
     [showToast],
   );
 
+  const stilUpdated = useCallback(
+    async (updated: string[]) => {
+      setStilOpen(false);
+      for (const rel of updated) {
+        unsaved.current.delete(rel);
+        hashes.current.delete(rel);
+        editor.current?.forgetFile(rel);
+      }
+      const cur = currentRef.current;
+      if (cur && updated.includes(cur)) {
+        currentRef.current = null;
+        await openFile(cur);
+      }
+      requestCompile();
+      void refreshStil();
+      if (updated.length)
+        showToast({ text: `Stil aktualisiert (${updated.length === 1 ? "1 Datei" : `${updated.length} Dateien`}). Die alten Fassungen liegen im Verlauf.` }, 5000);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [requestCompile, refreshStil, showToast],
+  );
+
   // Pick up files added or removed in the Finder when coming back to the app.
   useEffect(() => {
     const onFocus = () => {
@@ -364,6 +392,7 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
   useEffect(() => {
     svgCache.current.clear();
     openFile(project.main).then(() => requestCompile());
+    void refreshStil();
     return () => {
       flushSave();
     };
@@ -1101,6 +1130,14 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
       { id: "mathquote", label: `Text in Formeln automatisch quoten ${settings.mathQuote ? "aus" : "an"}`, group: "Einstellungen", icon: <Icon.settings />, run: () => setSettings({ mathQuote: !settings.mathQuote }) },
       { id: "wrap", label: `Zeilenumbruch ${settings.wrap ? "aus" : "an"}`, group: "Einstellungen", icon: <Icon.settings />, run: () => setSettings({ wrap: !settings.wrap }) },
       {
+        id: "stil",
+        label: "Stil aktualisieren …",
+        detail: "stil.typ und Vorlagen",
+        group: "Aktionen",
+        icon: <Icon.bolt />,
+        run: () => void refreshStil().then(() => setStilOpen(true)),
+      },
+      {
         id: "history",
         label: "Verlauf dieser Datei",
         detail: "frühere Stände",
@@ -1340,6 +1377,27 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
         )}
 
         <section className="editor-pane" style={{ flexBasis: `${split * 100}%` }}>
+          {(() => {
+            const veraltet = stil.filter((d) => d.status === "veraltet");
+            const kaputt = stil.filter((d) => d.status !== "aktuell" && diags.some((g) => g.severity === "error" && g.file === d.path));
+            if (stilLater || (!veraltet.length && !kaputt.length)) return null;
+            return (
+              <div className="conflict-bar stil-bar" role="status">
+                <Icon.bolt />
+                <span className="conflict-text">
+                  {kaputt.length
+                    ? <><b>{kaputt[0].path}</b> hat Fehler und weicht von der Fassung in NeoTypst ab.</>
+                    : <>Der Stil in diesem Projekt ist älter als in NeoTypst ({veraltet.map((d) => d.path.replace("templates/", "")).join(", ")}).</>}
+                </span>
+                <button className="btn" onClick={() => setStilLater(true)}>
+                  Später
+                </button>
+                <button className="btn primary" onClick={() => setStilOpen(true)}>
+                  Ansehen …
+                </button>
+              </div>
+            );
+          })()}
           {conflict && conflict === current && (
             <div className="conflict-bar" role="alert">
               <Icon.alert />
@@ -1507,6 +1565,15 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
             setSymbolsOpen(false);
             editor.current?.focus();
           }}
+        />
+      )}
+
+      {stilOpen && (
+        <StilDialog
+          files={stil}
+          broken={stil.filter((d) => diags.some((g) => g.severity === "error" && g.file === d.path)).map((d) => d.path)}
+          onDone={(u) => void stilUpdated(u)}
+          onClose={() => setStilOpen(false)}
         />
       )}
 

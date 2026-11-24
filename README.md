@@ -55,6 +55,17 @@ Projekt/
 - **Verlauf** (⌘K → „Verlauf dieser Datei“): frühere Stände mit Uhrzeit und einem Vergleich zum jetzigen Text. Gesichert wird beim Speichern höchstens alle 2 Minuten, sofort aber, wenn viel Text auf einmal verschwindet, und vor dem Neuladen, Überschreiben oder Wiederherstellen. „Wiederherstellen“ ist eine normale Bearbeitung, ⌘Z macht sie rückgängig.
 - Der Verlauf liegt im Projekt unter `.neotypst/verlauf/` und zieht mit dem Projekt um. Die letzten 24 Stunden bleiben vollständig, danach ein Stand pro Stunde (7 Tage) und pro Tag (30 Tage), höchstens 20 MB pro Projekt.
 
+### Stil aktuell halten
+
+Jedes Projekt hat eine eigene Kopie von `templates/stil.typ` (und je nach Vorlage `templates/arbeitsblatt.typ` usw.), damit es auch ohne NeoTypst kompiliert. Die erste Zeile nennt die Fassung, etwa `// neotypst-stil 0.5.0`.
+
+- Ist die Kopie eine unveränderte ältere Fassung, zeigt NeoTypst beim Öffnen einen Hinweis über dem Editor. „Ansehen …“ zeigt die Unterschiede und ersetzt die Datei. Die alte Fassung kommt vorher in den Verlauf.
+- Von Hand angepasste Kopien werden nie von selbst ersetzt. Sie lassen sich im selben Dialog (⌘K → „Stil aktualisieren …“) bewusst ersetzen. Hat eine angepasste Kopie Kompilierfehler, weist der Hinweis darauf hin.
+- In der Projektübersicht ersetzt „Stil in N Projekten veraltet“ alle unveränderten älteren Kopien auf einmal.
+- Das lokale Paket `@local/stil` stellt NeoTypst beim Start selbst bereit, immer in der eigenen Fassung.
+
+Erkannt werden ältere Fassungen an ihren Prüfsummen in `src-tauri/templates/_stil/versionen.txt`. Nach jeder Änderung an `stil.typ` oder den Vorlagen-Dateien `scripts/stil-versionen.py` ausführen und die Versionszeile erhöhen. Ein Test und `release.sh` prüfen das.
+
 ### Dateibaum
 
 - **Rechtsklick** auf eine Datei: Öffnen, als Hauptdatei festlegen, als Abbildung einfügen, Umbenennen, Duplizieren, Pfad kopieren (so, wie er in der aktuellen Datei für `#image`/`#include` geschrieben wird), im Finder zeigen, in den Papierkorb.

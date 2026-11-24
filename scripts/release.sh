@@ -27,6 +27,10 @@ if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
   exit 1
 fi
 
+# Jede veröffentlichte Stil-Fassung muss in versionen.txt stehen, sonst
+# hält die App Projekte mit dieser Fassung später für „angepasst“.
+python3 scripts/stil-versionen.py --check
+
 # Nur geprüfter Code: der Stand muss auf GitHub main sein und die CI grün.
 git fetch --quiet origin main
 SHA=$(git rev-parse HEAD)

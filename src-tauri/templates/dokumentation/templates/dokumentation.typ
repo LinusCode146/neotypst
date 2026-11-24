@@ -1,3 +1,4 @@
+// neotypst-stil 0.5.0
 // Technische Dokumentation (z. B. für Informatik-Projekte), aufgebaut auf stil.typ.
 
 #import "stil.typ": *

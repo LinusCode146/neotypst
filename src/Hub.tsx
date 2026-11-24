@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import { api, type ProjectInfo, type Template } from "./api";
+import { api, type ProjektStil, type ProjectInfo, type Template } from "./api";
+import { StilAlleDialog } from "./StilDialog";
 import { Icon } from "./icons";
 import { kbd, modKey } from "./platform";
 
@@ -317,9 +318,13 @@ export function Hub({ onOpen }: { onOpen(path: string): void }) {
   const [dialog, setDialog] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [stil, setStil] = useState<ProjektStil[]>([]);
+  const [stilOpen, setStilOpen] = useState(false);
+  const veraltet = stil.filter((p) => p.veraltet.length > 0);
 
   useEffect(() => {
     api.listProjects().then(setProjects).catch((e) => setError(String(e)));
+    api.stilScanAll().then(setStil, () => setStil([]));
     api.listTemplates().then(setTemplates);
     api.projectsDir().then(setDir);
   }, []);
@@ -390,6 +395,11 @@ export function Hub({ onOpen }: { onOpen(path: string): void }) {
 
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <h3 style={{ flex: 1 }}>Projekte</h3>
+          {veraltet.length > 0 && (
+            <button className="btn ghost small" title="Ersetzt unveränderte ältere Kopien von stil.typ und den Vorlagen" onClick={() => setStilOpen(true)}>
+              <Icon.bolt /> Stil in {veraltet.length === 1 ? "1 Projekt" : `${veraltet.length} Projekten`} veraltet
+            </button>
+          )}
           {projects && projects.length > 6 && (
             <input className="hub-search" placeholder="Suchen …" value={query} onChange={(e) => setQuery(e.target.value)} />
           )}
@@ -420,6 +430,15 @@ export function Hub({ onOpen }: { onOpen(path: string): void }) {
           <p style={{ color: "var(--muted)", fontSize: 12, marginTop: 10 }}>Projektordner: {dir}</p>
         )}
       </div>
+      {stilOpen && (
+        <StilAlleDialog
+          projects={stil}
+          onClose={() => {
+            setStilOpen(false);
+            api.stilScanAll().then(setStil, () => {});
+          }}
+        />
+      )}
       {dialog && (
         <NewProjectDialog templates={templates} initial={dialog} onClose={() => setDialog(null)} onCreated={(path) => onOpen(path)} />
       )}
