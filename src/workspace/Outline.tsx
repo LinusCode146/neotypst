@@ -1,7 +1,7 @@
-import { outlineOf } from "../outline";
+import type { Heading } from "../outline";
 
 /** Gliederung der offenen Datei in der Seitenleiste. */
-export function Outline({ items, onReveal }: { items: ReturnType<typeof outlineOf>; onReveal(line: number): void }) {
+export function Outline({ items, onReveal }: { items: Heading[]; onReveal(line: number): void }) {
   if (items.length === 0) return null;
   return (
     <div className="outline">

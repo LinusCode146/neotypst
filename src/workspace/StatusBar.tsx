@@ -1,5 +1,6 @@
 import type { Diag } from "../api";
 import { keyLabel } from "./commands";
+import { useStore, type Store } from "./store";
 
 /** Untere Leiste: Fehler, Kompilierzeit, Seiten, Rechtschreibung, vim, Cursor, Speicherstand. */
 export function StatusBar(p: {
@@ -10,7 +11,7 @@ export function StatusBar(p: {
   spell: string;
   spellInfo: { count: number; dominant: string | null };
   vimMode: string | null;
-  cursor: { line: number; col: number };
+  cursor: Store<{ line: number; col: number }>;
   dirty: boolean;
   onToggleProblems(): void;
   onSpellMenu(anchor: DOMRect): void;
@@ -51,10 +52,17 @@ export function StatusBar(p: {
         {p.spell !== "off" && p.spellInfo.count > 0 && <span className="spell-count">{p.spellInfo.count}</span>}
       </button>
       {p.vimMode && <span className="item vim">{p.vimMode.toUpperCase()}</span>}
-      <span className="item">
-        Z {p.cursor.line}, S {p.cursor.col}
-      </span>
+      <CursorPos store={p.cursor} />
       <span className="item">{p.dirty ? "Ungespeichert" : "Gespeichert"}</span>
     </footer>
+  );
+}
+
+function CursorPos({ store }: { store: Store<{ line: number; col: number }> }) {
+  const c = useStore(store);
+  return (
+    <span className="item">
+      Z {c.line}, S {c.col}
+    </span>
   );
 }

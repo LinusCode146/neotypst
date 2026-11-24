@@ -16,6 +16,7 @@ import { useSpell } from "./workspace/useSpell";
 import { useCompile } from "./workspace/useCompile";
 import { useEditorTools } from "./workspace/useEditorTools";
 import type { Menu, Toast } from "./workspace/types";
+import { createStore } from "./workspace/store";
 import { Titlebar } from "./workspace/Titlebar";
 import { StatusBar } from "./workspace/StatusBar";
 import { Outline } from "./workspace/Outline";
@@ -33,7 +34,7 @@ import { GraphicsGallery } from "./GraphicsGallery";
 import { SearchPanel } from "./SearchPanel";
 import { beforeRestart } from "./updater";
 import { kbd } from "./platform";
-import { outlineOf } from "./outline";
+import { outlineOf, type Heading } from "./outline";
 
 
 const IMAGE_EXT = /\.(png|jpe?g|gif|svg|webp)$/i;
@@ -47,14 +48,24 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
   const [files, setFiles] = useState<FileEntry[]>(project.files);
   const [main, setMain] = useState(project.main);
   const [current, setCurrent] = useState<string | null>(null);
-  const [text, setText] = useState("");
+  // Der Text lebt im Editor. Gliederung und Suche bekommen ihn erst nach einer
+  // kurzen Tipp-Pause, damit nicht jeder Tastendruck die ganze Ansicht neu rendert.
+  const [outline, setOutline] = useState<Heading[]>([]);
+  const [textVersion, setTextVersion] = useState(0);
+  const textTimer = useRef<number | undefined>(undefined);
+  const textSettled = useCallback((t: string) => {
+    const next = outlineOf(t);
+    setOutline((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
+    setTextVersion((v) => v + 1);
+  }, []);
   const [marker, setMarker] = useState<Marker | null>(null);
   const [solutions, setSolutions] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [palette, setPalette] = useState<null | "all" | "files">(null);
   const [showProblems, setShowProblems] = useState(false);
   const [vimMode, setVimMode] = useState<string | null>(null);
-  const [cursor, setCursor] = useState({ line: 1, col: 1 });
+  /** Cursorposition für die Statusleiste; ändert sich bei jedem Tastendruck, deshalb kein State hier. */
+  const cursorStore = useMemo(() => createStore({ line: 1, col: 1 }), []);
   const [menu, setMenu] = useState<Menu | null>(null);
   const [toast, setToast] = useState<Toast | null>(null);
   const [split, setSplit] = useState(() => Number(localStorage.getItem("neotypst.split")) || 0.5);
@@ -242,7 +253,8 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
         hashes.current.set(rel, hash);
         editor.current?.openFile(rel, t);
         setCurrent(rel);
-        setText(t);
+        window.clearTimeout(textTimer.current);
+        textSettled(t);
         latest.current = { rel, text: t };
         editor.current?.setDiagnostics(diagsRef.current);
         if (reveal != null) editor.current?.reveal(reveal);
@@ -278,7 +290,8 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
   const onChange = useCallback(
     (rel: string, t: string) => {
       lastEdit.current = Date.now();
-      setText(t);
+      window.clearTimeout(textTimer.current);
+      textTimer.current = window.setTimeout(() => textSettled(t), 300);
       latest.current = { rel, text: t };
       unsaved.current.set(rel, t);
       setDirty(true);
@@ -292,7 +305,7 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
 
   const cursorOffset = useRef(0);
   const onCursor = useCallback((rel: string, offset: number, line: number, col: number) => {
-    setCursor({ line, col });
+    cursorStore.set({ line, col });
     cursorOffset.current = offset;
     window.clearTimeout(cursorTimer.current);
     // Die Vorschau folgt immer der Seite, auf der gerade gearbeitet wird. Beim
@@ -596,7 +609,6 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
   // ---------- Render ----------
 
   const firstError = diags.find((d) => d.severity === "error");
-  const outline = useMemo(() => outlineOf(text), [text]);
 
 
   const treeActions: TreeActions = useMemo(
@@ -707,7 +719,7 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
               <SearchPanel
                 files={files}
                 current={current}
-                textVersion={text}
+                textVersion={String(textVersion)}
                 initialQuery={searchOpen.initial}
                 focusKey={searchOpen.n}
                 liveText={(rel) => (rel === currentRef.current ? (editor.current?.getText() ?? null) : (unsaved.current.get(rel) ?? null))}
@@ -802,7 +814,7 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
         spell={settings.spell}
         spellInfo={spellInfo}
         vimMode={vimMode}
-        cursor={cursor}
+        cursor={cursorStore}
         dirty={dirty}
         onToggleProblems={() => setShowProblems((s) => !s)}
         onSpellMenu={(r) =>
@@ -883,7 +895,7 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
       {historyOpen && current && (
         <HistoryDialog
           rel={current}
-          current={editor.current?.getText() ?? text}
+          current={editor.current?.getText() ?? ""}
           onRestore={(t, e) => void restoreFromHistory(t, e)}
           onClose={() => setHistoryOpen(false)}
         />
