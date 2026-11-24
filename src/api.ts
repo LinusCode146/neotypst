@@ -37,6 +37,8 @@ export type BibEntry = { key: string; kind: string; title: string; authors: stri
 export type BibOverview = { files: string[]; target: string; call_file: string | null; style: string | null; entries: BibEntry[]; errors: string[] };
 export type SpellIssue = { from: number; to: number; word: string; lang: string; suggestions: string[] };
 
+export type StilDatei = { path: string; status: "aktuell" | "veraltet" | "angepasst"; version: string | null };
+export type ProjektStil = { name: string; path: string; veraltet: string[]; angepasst: string[] };
 export type HistoryEntry = { id: string; zeit: number; grund: string; bytes: number };
 /** Fehlertext von write_file, wenn die Datei von außen geändert wurde. */
 export const isConflict = (e: unknown) => String(e).startsWith("konflikt");
@@ -64,6 +66,11 @@ export const api = {
   fileHash: (rel: string) => invoke<string | null>("file_hash", { rel }),
   historyList: (rel: string) => invoke<HistoryEntry[]>("history_list", { rel }),
   historyRead: (rel: string, id: string) => invoke<string>("history_read", { rel, id }),
+  stilStatus: () => invoke<StilDatei[]>("stil_status"),
+  stilBundled: (path: string) => invoke<string>("stil_bundled", { path }),
+  stilUpdate: (paths: string[]) => invoke<string[]>("stil_update", { paths }),
+  stilScanAll: () => invoke<ProjektStil[]>("stil_scan_all"),
+  stilUpdateProject: (path: string, paths: string[]) => invoke<string[]>("stil_update_project", { path, paths }),
   historySnapshot: (rel: string, text: string, reason: string) => invoke<boolean>("history_snapshot", { rel, text, reason }),
   createFile: (rel: string) => invoke<void>("create_file", { rel }),
   renameFile: (from: string, to: string) => invoke<void>("rename_file", { from, to }),
