@@ -178,6 +178,7 @@ impl Engine {
         Ok(())
     }
 
+    #[cfg(test)]
     pub fn set_solutions(&mut self, on: bool) -> Result<(), String> {
         let s = self.session()?;
         s.solutions = on;

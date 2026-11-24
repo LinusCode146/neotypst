@@ -7,7 +7,6 @@ export function Titlebar(p: {
   current: string | null;
   dirty: boolean;
   sidebar: boolean;
-  solutions: boolean;
   zoom: number;
   title(id: string, label: string): string;
   onHome(): void;
@@ -17,7 +16,6 @@ export function Titlebar(p: {
   onSymbols(): void;
   onGrid(): void;
   onPalette(): void;
-  onToggleSolutions(): void;
   onZoom(z: number): void;
   onExportMenu(anchor: DOMRect): void;
 }) {
@@ -54,10 +52,6 @@ export function Titlebar(p: {
       </button>
       <button className="btn ghost" onClick={p.onPalette} title="Befehle, Bausteine, Dateien">
         <Icon.search /> <span style={{ color: "var(--muted)" }}>Befehle</span> <kbd>{keyLabel("mod+k")}</kbd>
-      </button>
-      <div className="divider" />
-      <button className={"toggle" + (p.solutions ? " on" : "")} onClick={p.onToggleSolutions} title={p.title("solutions", "Lösungen ein-/ausblenden")}>
-        <span className="knob" /> Lösungen
       </button>
       <div className="divider" />
       <div className="group">

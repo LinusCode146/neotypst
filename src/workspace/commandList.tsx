@@ -15,13 +15,11 @@ export const spellLabel = (m: string) => ({ auto: "Automatisch", de: "Deutsch", 
 
 export type CommandContext = {
   settings: Settings;
-  solutions: boolean;
   project: { name: string; root: string };
   main: string;
   togglePalette(kind: "all" | "files"): void;
   exportPdf(both: boolean): void;
   exportPdfAs(): void;
-  toggleSolutions(): void;
   editorCommand(name: "convertTable"): void;
   insertSnippet(body: string): void;
   openLiterature(): void;
@@ -72,15 +70,6 @@ export function buildCommands(ctx: CommandContext, files: Command[]): Command[] 
       group: "Aktionen",
       icon: <Icon.export />,
       run: ctx.exportPdfAs,
-    },
-    {
-      id: "solutions",
-      label: ctx.solutions ? "Lösungen ausblenden" : "Lösungen einblenden",
-      keys: "mod+shift+l",
-      keywords: "loesung",
-      group: "Aktionen",
-      icon: <Icon.eye />,
-      run: ctx.toggleSolutions,
     },
     {
       id: "convert-table",

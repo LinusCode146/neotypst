@@ -60,6 +60,8 @@ export const api = {
 
   listFiles: () => invoke<FileEntry[]>("list_files"),
   readFile: (rel: string) => invoke<string>("read_file", { rel }),
+  /** Rohdaten einer Datei, z. B. ein PDF oder Bild für den Betrachter. */
+  readBytes: (rel: string) => invoke<ArrayBuffer>("read_bytes", { rel }),
   /** Speichert; mit `expected` nur, wenn die Datei nicht von außen geändert wurde. Gibt die neue Prüfsumme zurück. */
   writeFile: (rel: string, text: string, expected?: string | null) => invoke<string>("write_file", { rel, text, expected }),
   openText: (rel: string) => invoke<{ text: string; hash: string }>("open_text", { rel }),
@@ -88,7 +90,6 @@ export const api = {
 
   compile: (rel?: string, text?: string) => invoke<CompileOut>("compile", { rel, text }),
   setMain: (rel: string) => invoke<void>("set_main", { rel }),
-  setSolutions: (on: boolean) => invoke<void>("set_solutions", { on }),
   forgetPreview: () => invoke<void>("forget_preview"),
   jumpFromClick: (page: number, x: number, y: number) => invoke<Jump | null>("jump_from_click", { page, x, y }),
   jumpFromCursor: (rel: string, offset: number) => invoke<Pos[]>("jump_from_cursor", { rel, offset }),

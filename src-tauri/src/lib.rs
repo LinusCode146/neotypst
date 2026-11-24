@@ -120,6 +120,13 @@ fn read_file(state: State<'_, AppState>, rel: String) -> Result<String, String> 
     project::read_text(&state.root()?, &rel)
 }
 
+/// Rohdaten einer Datei (PDF, Bild) für den eingebauten Betrachter.
+#[tauri::command]
+fn read_bytes(state: State<'_, AppState>, rel: String) -> Result<tauri::ipc::Response, String> {
+    let path = project::resolve(&state.root()?, &rel)?;
+    std::fs::read(path).map(tauri::ipc::Response::new).map_err(|e| e.to_string())
+}
+
 /// Speichert und gibt die neue Prüfsumme zurück. Mit `expected` verweigert es
 /// das Speichern, wenn die Datei inzwischen von außen geändert wurde.
 #[tauri::command]
@@ -283,11 +290,6 @@ async fn set_main(state: State<'_, AppState>, rel: String) -> Result<(), String>
 }
 
 #[tauri::command]
-async fn set_solutions(state: State<'_, AppState>, on: bool) -> Result<(), String> {
-    state.engine.run(move |e| e.set_solutions(on)).await
-}
-
-#[tauri::command]
 async fn forget_preview(state: State<'_, AppState>) -> Result<(), String> {
     state.engine.run(|e| e.forget_preview()).await
 }
@@ -443,10 +445,10 @@ pub fn run() {
             restore_file,
             absolute_path,
             save_asset,
+            read_bytes,
             format_typst,
             compile,
             set_main,
-            set_solutions,
             forget_preview,
             jump_from_click,
             jump_from_cursor,

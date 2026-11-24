@@ -218,7 +218,7 @@ export function FileTree({ projectRoot, files, current, main, actions, request }
       items.push({ label: "Neuer Ordner hier …", run: () => startNew("dir", n.path) });
       items.push("sep");
     } else {
-      if (n.kind === "typ" || n.kind === "text") items.push({ label: "Öffnen", run: () => actions.open(n.path, n.kind) });
+      if (n.kind !== "other") items.push({ label: "Öffnen", run: () => actions.open(n.path, n.kind) });
       if (n.kind === "typ" && n.path !== main) items.push({ label: "Als Hauptdatei festlegen", run: () => actions.setMain(n.path) });
       if (n.kind === "image") items.push({ label: "Als Abbildung einfügen", run: () => actions.insertImage(n.path) });
       if (n.kind !== "typ" && n.kind !== "text") items.push({ label: "Mit Standard-App öffnen", run: () => actions.openExternal(n.path) });
@@ -473,10 +473,10 @@ export function FileTree({ projectRoot, files, current, main, actions, request }
                   setSelected(n.path);
                   treeRef.current?.focus();
                   if (isDir) toggle(n.path);
-                  else if (n.kind === "typ" || n.kind === "text") actions.open(n.path, n.kind);
+                  else if (n.kind !== "other") actions.open(n.path, n.kind);
                 }}
                 onDoubleClick={() => {
-                  if (n.kind === "image" || n.kind === "pdf" || n.kind === "other") actions.openExternal(n.path);
+                  if (n.kind === "other") actions.openExternal(n.path);
                 }}
                 onContextMenu={(e) => fileMenu(e, n)}
               >
