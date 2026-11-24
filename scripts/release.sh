@@ -6,6 +6,8 @@
 #   scripts/release.sh            Version aus src-tauri/tauri.conf.json
 #   scripts/release.sh --draft    als Entwurf anlegen
 #
+# Veröffentlicht nur origin/main, und nur wenn die CI dafür grün ist.
+#
 # Braucht den privaten Update-Schlüssel (~/.tauri/neotypst.key oder
 # TAURI_SIGNING_PRIVATE_KEY) und ein angemeldetes `gh`.
 set -euo pipefail
@@ -24,6 +26,15 @@ if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
   echo "Release $TAG gibt es schon. Version in tauri.conf.json, Cargo.toml und package.json erhöhen."
   exit 1
 fi
+
+# Nur geprüfter Code: der Stand muss auf GitHub main sein und die CI grün.
+git fetch --quiet origin main
+SHA=$(git rev-parse HEAD)
+[[ -z "$(git status --porcelain --untracked-files=no)" ]] || { echo "Ungespeicherte Änderungen. Erst committen."; exit 1; }
+[[ "$SHA" == "$(git rev-parse origin/main)" ]] || { echo "HEAD ist nicht origin/main. Erst nach main mergen und pushen."; exit 1; }
+CI=$(gh run list --repo "$REPO" --workflow ci.yml --commit "$SHA" --json status,conclusion \
+  -q 'map(select(.status == "completed")) | .[0].conclusion // "fehlt"')
+[[ "$CI" == "success" ]] || { echo "CI für $SHA ist nicht grün ($CI). Ergebnis abwarten oder Fehler beheben."; exit 1; }
 
 if [[ -z "${TAURI_SIGNING_PRIVATE_KEY:-}" ]]; then
   KEY="$HOME/.tauri/neotypst.key"

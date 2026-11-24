@@ -388,9 +388,15 @@ mod file_ops_tests {
         assert!(trash(&root, "").is_err());
         assert!(resolve(&root, "../x").is_err());
         let trashed = trash(&root, "teile/kapitel/a.typ").unwrap();
-        assert!(!root.join("teile/kapitel/a.typ").exists() && Path::new(&trashed).exists());
-        restore(&root, &trashed, "teile/kapitel/a.typ").unwrap();
-        assert!(root.join("teile/kapitel/a.typ").exists());
+        assert!(!root.join("teile/kapitel/a.typ").exists());
+        if cfg!(target_os = "macos") {
+            // Nur macOS sagt, wo die Datei im Papierkorb liegt; nur dort gibt es „Rückgängig“.
+            assert!(Path::new(&trashed).exists());
+            restore(&root, &trashed, "teile/kapitel/a.typ").unwrap();
+            assert!(root.join("teile/kapitel/a.typ").exists());
+        } else {
+            assert!(trashed.is_empty());
+        }
         let _ = fs::remove_dir_all(&root);
     }
 }

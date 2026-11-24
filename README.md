@@ -247,16 +247,20 @@ Die Update-Pakete sind mit einem eigenen Schlüssel signiert. Die App installier
 
 1. Version in `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` und `package.json` erhöhen
 2. Release-Notizen nach `release-notes/vX.Y.Z.md` schreiben (sie erscheinen auch in der Update-Karte)
-3. `scripts/release.sh` ausführen. Das Skript baut die App getrennt für Apple Silicon und Intel, signiert die Update-Pakete mit `~/.tauri/neotypst.key` und lädt je ein DMG und ein Update-Paket sowie `latest.json` als GitHub-Release hoch.
-4. Sobald das Release veröffentlicht ist, baut der Workflow `.github/workflows/windows.yml` auf GitHub den Windows-Installer, hängt `NeoTypst_X.Y.Z_Windows-Setup.exe` an das Release und trägt Windows in `latest.json` ein. Dafür braucht das Repository das Secret `TAURI_SIGNING_PRIVATE_KEY` mit dem Inhalt von `~/.tauri/neotypst.key`. Unter Actions → Windows → „Run workflow“ gibt es einen Test-Build ohne Release.
+3. Änderungen über einen Pull Request nach main bringen und warten, bis die CI grün ist.
+4. `scripts/release.sh` ausführen. Das Skript baut die App getrennt für Apple Silicon und Intel, signiert die Update-Pakete mit `~/.tauri/neotypst.key` und lädt je ein DMG und ein Update-Paket sowie `latest.json` als GitHub-Release hoch.
+5. Sobald das Release veröffentlicht ist, baut der Workflow `.github/workflows/windows.yml` auf GitHub den Windows-Installer, hängt `NeoTypst_X.Y.Z_Windows-Setup.exe` an das Release und trägt Windows in `latest.json` ein. Dafür braucht das Repository das Secret `TAURI_SIGNING_PRIVATE_KEY` mit dem Inhalt von `~/.tauri/neotypst.key`. Unter Actions → Windows → „Run workflow“ gibt es einen Test-Build ohne Release.
 
 Der private Schlüssel `~/.tauri/neotypst.key` gehört nicht ins Repository. Geht er verloren, können bestehende Installationen keine Updates mehr annehmen. Bewahre also eine Sicherungskopie auf, etwa im Passwortmanager.
 
 ## Tests
 
 ```bash
-cd src-tauri && cargo test --lib
+npm test                          # Oberfläche (Vitest)
+cd src-tauri && cargo test --lib  # Rust
 ```
+
+Beides läuft auch automatisch auf GitHub (`.github/workflows/ci.yml`), bei jedem Pull Request und jedem Push auf main, unter macOS und Windows. `scripts/release.sh` veröffentlicht nur einen Stand, der auf `origin/main` liegt und für den diese CI grün ist.
 
 Die Tests prüfen unter anderem, dass jede Vorlage, jeder Grafik-Baustein, jeder Zitierstil und jede erzeugte Tabelle fehlerfrei kompiliert. Außerdem testen sie Autovervollständigung, Klick-Sprung, das Einlesen von Tabellen und Matrizen, die Erkennung von Text in Formeln, das Formatieren, die Namen eingefügter Bilder und die Rechtschreibprüfung (mit dem echten macOS-Wörterbuch). Tests, die ins Netz gehen, sind mit `#[ignore]` markiert (`cargo test --lib -- --ignored`).
 

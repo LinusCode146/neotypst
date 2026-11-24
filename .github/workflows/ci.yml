@@ -1,0 +1,50 @@
+# Prüft jeden Push auf main und jeden Pull Request: Typen, Oberflächen-Tests und
+# Rust-Tests, auf macOS und Windows. scripts/release.sh veröffentlicht nur
+# Commits, für die dieser Workflow grün ist.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - run: npm ci
+
+      - name: Typen prüfen und Oberfläche bauen
+        run: npm run build
+
+      - name: Oberflächen-Tests
+        run: npm test
+
+      - name: Rust-Tests
+        working-directory: src-tauri
+        run: cargo test --lib
