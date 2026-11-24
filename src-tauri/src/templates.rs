@@ -484,6 +484,26 @@ Siehe @a und @b.
   #figure(table(columns: 2, [a], [b]), caption: [T])
 ]
 #context assert(not _akademisch())
+
+// Aufgabe ohne Nummer zählt nicht mit
+#_aufgabe.update(5)
+#aufgabe(nr: none)[Ohne Nummer]
+#context assert.eq(_aufgabe.get().first(), 5)
+
+// Profil „schlicht“: wie akademisch, nur ohne Linien
+#[
+  #show: stil.with(profil: "schlicht")
+  #context assert(_akademisch())
+  #context assert(not _linien())
+  #aufgabe(punkte: 2)[+ a + b]
+  ```python
+  print(1)
+  ```
+]
+#[
+  #show: stil.with(profil: "akademisch")
+  #context assert(_linien())
+]
 "#;
         std::fs::write(dir.join("main.typ"), main).unwrap();
         let mut engine = Engine::new();

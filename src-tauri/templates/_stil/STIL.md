@@ -46,6 +46,7 @@ Der Kasten ist neutral hellgrau, der Kopf „Aufgabe N“ fett. Standardmäßig 
 #aufgabe[Wie hoch ist die Gewinnwahrscheinlichkeit?]
 #aufgabe(titel: "Annas Wette")[…]      // Thema neben der Nummer
 #aufgabe(nr: "3.12")[…]                // Nummer aus dem Buch, zählt nicht mit
+#aufgabe(nr: none)[…]                  // nur „Aufgabe“, ohne Nummer, zählt nicht mit
 #aufgabe(punkte: 4)[…]                 // Punkte rechts im Kopf
 #aufgabe[#image("aufgabe3.png")]       // Screenshot als Aufgabe
 ```
@@ -148,7 +149,7 @@ Alle Bausteine bleiben gleich: `aufgabe`, `teil`, `erg`, `antwort`, ausgerichtet
 | Eulersche Zahl | kursiv | aufrecht: e, eˣ | DIN 1338 Tab. 1, ISO 80000-2 (Konstanten mit fester Bedeutung) |
 | Tabellen | Gitter | Linien nur oben, unter dem Kopf, unten; Unterschrift oben | Buchsatz (booktabs), Tabellenunterschrift über der Tabelle |
 | Abbildungsunterschrift | Tabelle 1: … | **Tabelle 1:** … | Fachartikel |
-| Quelltext | grau hinterlegt | zwischen zwei feinen Linien | LaTeX `listings` mit `frame=lines` |
+| Quelltext | grau hinterlegt | ohne Fläche und Linien, nur Abstand | LaTeX `listings` ohne Rahmen |
 | Zitate | Typst-Standard | eingerückt, kleiner, ohne Anführungszeichen | Chicago ab fünf Zeilen, deutsche Uni-Vorgaben oft ab drei |
 | Seitenzahl | nur in Vorlagen | unten mittig | LaTeX `plain` |
 
@@ -165,3 +166,13 @@ Bewusst nicht übernommen:
 - 1,5-facher Zeilenabstand und Times 12 pt aus Uni-Formatvorgaben. Diese Werte stammen aus der Zeit von Word und Schreibmaschine. Bei gesetztem Text mit Formeln wirken sie lose.
 - Ein eigenes „Lösung:“ unter jeder Aufgabe. Viele Musterlösungen schreiben es hin, hier trennt schon die Linie unter der Aufgabenstellung.
 - Doppelte Unterstreichung ersetzen. An der Uni ist sie unüblich, sie bleibt aber, weil `erg` ein Baustein dieses Stils ist.
+
+### Profil „schlicht“
+
+Wie „akademisch“, nur ohne die beiden feinen Linien über und unter der Aufgabenstellung. Alles andere bleibt gleich: 11 pt, Satzspiegel, Blocksatz, (a), aufrechtes e, Tabellen im Buchsatz-Stil.
+
+```typst
+#show: stil.with(profil: "schlicht")
+#show: hausaufgabe.with(profil: "schlicht", …)
+```
+
