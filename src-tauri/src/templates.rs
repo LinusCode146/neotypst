@@ -71,6 +71,20 @@ macro_rules! tpl_file {
 /// Dieselbe Datei gibt es als `@local/stil` (siehe templates/_stil/README.md).
 const STIL: (&str, &str) = ("templates/stil.typ", include_str!("../templates/_stil/stil.typ"));
 
+/// Dateien, die NeoTypst in Projekte kopiert und aktuell hält: der Stil und
+/// die Bausteine der Vorlagen (Projektpfad, mitgelieferter Inhalt).
+pub fn managed_files() -> Vec<(&'static str, &'static str)> {
+    let mut out = vec![STIL];
+    for b in BUILTIN {
+        for f in b.files {
+            if f.0.starts_with("templates/") && !out.iter().any(|o| o.0 == f.0) {
+                out.push(*f);
+            }
+        }
+    }
+    out
+}
+
 struct Builtin {
     id: &'static str,
     name: &'static str,
