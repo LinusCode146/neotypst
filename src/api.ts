@@ -94,7 +94,8 @@ export const api = {
   jumpFromCursor: (rel: string, offset: number) => invoke<Pos[]>("jump_from_cursor", { rel, offset }),
   complete: (rel: string, text: string, offset: number, explicit: boolean) =>
     invoke<{ from: number; items: Completion[] } | null>("complete", { rel, text, offset, explicit }),
-  exportPdf: (both: boolean) => invoke<string[]>("export_pdf", { both }),
+  /** Nach out/ exportieren; mit `target` genau eine PDF an diesen Ort (Speichern unter). */
+  exportPdf: (both: boolean, target?: string) => invoke<string[]>("export_pdf", { both, target }),
   matrixAt: (text: string, offset: number) =>
     invoke<{ from: number; to: number; func: string; args: string } | null>("matrix_at", { text, offset }),
   tableAt: (text: string, offset: number) =>

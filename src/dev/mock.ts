@@ -203,6 +203,13 @@ const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
       .join("\n");
     return out === t.slice(a, b) ? null : { from: a, to: b, text: out };
   },
+  export_pdf: ({ target }) => [(target as string | undefined) ?? "/Users/du/Documents/Typst/Physik/out/main.pdf"],
+  "plugin:path|resolve_directory": () => "/Users/du/Downloads",
+  "plugin:path|join": ({ paths }) => (paths as string[]).join("/"),
+  "plugin:dialog|save": (args) => {
+    console.info("[mock] save dialog", JSON.stringify(args));
+    return (args as { options: { defaultPath: string } }).options.defaultPath;
+  },
   "plugin:event|listen": () => 1,
   "plugin:event|unlisten": () => null,
 };

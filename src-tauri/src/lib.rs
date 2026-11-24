@@ -324,8 +324,9 @@ async fn math_word(
 }
 
 #[tauri::command]
-async fn export_pdf(state: State<'_, AppState>, both: bool) -> Result<Vec<String>, String> {
-    state.engine.run(move |e| e.export_pdf(both)).await
+async fn export_pdf(state: State<'_, AppState>, both: bool, target: Option<String>) -> Result<Vec<String>, String> {
+    let target = target.map(std::path::PathBuf::from);
+    state.engine.run(move |e| e.export_pdf(both, target)).await
 }
 
 #[tauri::command]

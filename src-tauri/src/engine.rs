@@ -374,10 +374,15 @@ impl Engine {
 
     /// Exports PDFs into `<project>/out/`. With `both`, exports a student and
     /// a solution version (`-loesung`). Returns the written paths.
-    pub fn export_pdf(&mut self, both: bool) -> Result<Vec<String>, String> {
+    /// Exportiert nach `out/`. Mit `target` („Speichern unter …“) genau eine
+    /// Datei an diesen Ort, in der Fassung, die gerade angezeigt wird.
+    pub fn export_pdf(&mut self, both: bool, target: Option<PathBuf>) -> Result<Vec<String>, String> {
         let s = self.session()?;
         let out_dir = s.world.root().join("out");
-        std::fs::create_dir_all(&out_dir).map_err(|e| e.to_string())?;
+        if target.is_none() {
+            std::fs::create_dir_all(&out_dir).map_err(|e| e.to_string())?;
+        }
+        let both = both && target.is_none();
         let stem = s
             .world
             .rel_path(s.world.main())
@@ -412,7 +417,7 @@ impl Engine {
                 }
             };
             let name = if both && solutions { format!("{stem}-loesung.pdf") } else { format!("{stem}.pdf") };
-            let path = out_dir.join(name);
+            let path = target.clone().unwrap_or_else(|| out_dir.join(name));
             std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
             written.push(path.to_string_lossy().into_owned());
         }
@@ -589,6 +594,26 @@ mod tests {
 
     /// Ein Klick auf Text, den eine Vorlage erzeugt, springt nicht in die
     /// Vorlage, sondern zur nächsten Stelle im eigenen Dokument.
+    #[test]
+    fn export_to_out_or_chosen_path() {
+        let dir = std::env::temp_dir().join("neotypst-export-test");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("main.typ"), "Hallo").unwrap();
+        let mut e = Engine::new();
+        e.open(dir.clone(), "main.typ".into()).unwrap();
+        let out = e.export_pdf(true, None).unwrap();
+        assert_eq!(out.len(), 2);
+        assert!(dir.join("out/main.pdf").is_file() && dir.join("out/main-loesung.pdf").is_file());
+        // Speichern unter: genau eine Datei an den gewählten Ort, auch wenn `both` gesetzt ist.
+        let ziel = dir.join("woanders/abgabe.pdf");
+        std::fs::create_dir_all(ziel.parent().unwrap()).unwrap();
+        let out = e.export_pdf(true, Some(ziel.clone())).unwrap();
+        assert_eq!(out, [ziel.to_string_lossy().into_owned()]);
+        assert!(std::fs::read(&ziel).unwrap().starts_with(b"%PDF"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     #[test]
     fn click_on_template_text_lands_in_document() {
         let dir = std::env::temp_dir().join("neotypst-template-jump-test");
