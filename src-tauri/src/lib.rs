@@ -290,6 +290,17 @@ async fn set_main(state: State<'_, AppState>, rel: String) -> Result<(), String>
 }
 
 #[tauri::command]
+async fn set_schrift(state: State<'_, AppState>, text: String, formeln: String) -> Result<(), String> {
+    state.engine.run(move |e| e.set_schrift(text, formeln)).await;
+    Ok(())
+}
+
+#[tauri::command]
+async fn schriften_vorhanden(familien: Vec<String>) -> Vec<bool> {
+    world::schriften_vorhanden(&familien)
+}
+
+#[tauri::command]
 async fn forget_preview(state: State<'_, AppState>) -> Result<(), String> {
     state.engine.run(|e| e.forget_preview()).await
 }
@@ -419,10 +430,9 @@ fn bib_make_key(authors: Vec<String>, year: Option<i32>, title: String, taken: V
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Discover fonts in the background so the first compile doesn't wait.
-    std::thread::spawn(|| {
-        std::sync::LazyLock::force(&world::FONTS);
-    });
+    // Schriften und mitgelieferte Pakete im Hintergrund vorbereiten, damit
+    // das erste Kompilieren nicht wartet.
+    std::thread::spawn(world::vorbereiten);
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -471,6 +481,8 @@ pub fn run() {
             compile,
             set_main,
             forget_preview,
+            set_schrift,
+            schriften_vorhanden,
             jump_from_click,
             jump_from_cursor,
             complete,

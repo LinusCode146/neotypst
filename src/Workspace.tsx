@@ -39,6 +39,7 @@ import { beforeRestart } from "./updater";
 import { kbd } from "./platform";
 import { outlineOf, type Heading } from "./outline";
 import { FileViewer, type ViewKind } from "./FileViewer";
+import { SCHRIFTEN, schriftAnwenden, schriftById } from "./schriften";
 
 
 const IMAGE_EXT = /\.(png|jpe?g|gif|svg|webp)$/i;
@@ -135,6 +136,34 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
   const { spellInfo, scheduleSpell, onSpellAction } = useSpell({ editor, currentRef, current, root: project.root, showToast });
 
   const { pages, diags, diagsRef, millis, compiling, requestCompile, latest, svgCache } = useCompile({ editor, showToast });
+
+  // Andere Dokumentschrift: neu kompilieren (die erste setzt main.tsx).
+  const schriftGesetzt = useRef(settings.schrift);
+  useEffect(() => {
+    if (schriftGesetzt.current === settings.schrift) return;
+    schriftGesetzt.current = settings.schrift;
+    schriftAnwenden(settings.schrift)
+      .then(requestCompile)
+      .catch((e) => showToast({ text: String(e), kind: "error" }));
+  }, [settings.schrift, requestCompile, showToast]);
+
+  // Welche Schriften auf diesem Rechner vorhanden sind, für das Menü.
+  const [schriftDa, setSchriftDa] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    const alle = SCHRIFTEN.flatMap((s) => s.familien);
+    api
+      .schriftenVorhanden(alle)
+      .then((da) => {
+        const vorhanden = new Set(alle.filter((_, i) => da[i]));
+        setSchriftDa(Object.fromEntries(SCHRIFTEN.map((s) => [s.id, s.familien.some((f) => vorhanden.has(f))])));
+      })
+      .catch(() => {});
+  }, []);
+  const schriftItems = SCHRIFTEN.map((s) => ({
+    label: (settings.schrift === s.id ? "✓ " : "   ") + s.label,
+    detail: schriftDa[s.id] === false ? "nicht installiert" : s.detail || undefined,
+    run: () => setSettings({ schrift: s.id }),
+  }));
 
   // ---------- Files ----------
 
@@ -756,6 +785,8 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
         cursor={cursorStore}
         dirty={dirty}
         onToggleProblems={() => setShowProblems((s) => !s)}
+        schrift={schriftById(settings.schrift).label}
+        onSchriftMenu={(r) => setMenu({ x: r.left, y: r.top - 8 - SCHRIFTEN.length * 28 - 10, items: schriftItems })}
         onSpellMenu={(r) =>
           setMenu({
             x: r.left,

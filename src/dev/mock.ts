@@ -80,6 +80,8 @@ const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
   },
   absolute_path: ({ rel }) => "/Users/du/Documents/Typst/Physik/" + rel,
   read_file: () => disk,
+  set_schrift: () => null,
+  schriften_vorhanden: ({ familien }) => (familien as string[]).map((f) => !["Libron", "XCharter", "Palatino Linotype"].includes(f)),
   read_bytes: async ({ rel }) => (await fetch(/\.pdf$/.test(rel as string) ? musterPdf : musterPng)).arrayBuffer(),
   open_text: () => ({ text: disk, hash: mockHash(disk) }),
   file_hash: () => mockHash(disk),

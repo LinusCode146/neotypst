@@ -527,12 +527,11 @@ kbd {
   border-radius: 1px;
   cursor: text;
 }
-.page .svg-host,
-.page .svg-host svg,
-.page .svg-host img {
+.page-img {
   display: block;
   width: 100%;
   height: 100%;
+  user-select: none;
 }
 .page-number {
   position: absolute;

@@ -431,6 +431,39 @@ mod tests {
         }
     }
 
+    /// Die Dokumentschrift aus den Einstellungen gilt, solange das Dokument
+    /// keine eigene `schrift` setzt.
+    #[test]
+    fn dokumentschrift() {
+        let dir = std::env::temp_dir().join("neotypst-dokumentschrift-test");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("templates")).unwrap();
+        std::fs::write(dir.join("templates/stil.typ"), STIL.1).unwrap();
+        let main = r#"#import "templates/stil.typ": *
+#show: stil
+#context assert.eq(text.font.first(), "libertinus serif")
+$ x $
+`code`
+#[
+  #show: stil.with(schrift: "DejaVu Sans Mono")
+  #context assert.eq(text.font.first(), "dejavu sans mono")
+]
+"#;
+        std::fs::write(dir.join("main.typ"), main).unwrap();
+        let mut engine = Engine::new();
+        engine.open(dir, "main.typ".into()).unwrap();
+        // Nur in Typst eingebaute Schriften, damit der Test überall gleich läuft.
+        engine.set_schrift("Gibt es nicht, Libertinus Serif".into(), "Libertinus Math".into());
+        let out = engine.compile(None, None);
+        engine.set_schrift(String::new(), String::new());
+        let out = out.unwrap();
+        assert!(out.errors().is_empty(), "{:?}", out.errors());
+        // Fehlende Familien aus der Liste warnen nicht.
+        assert!(!out.messages().iter().any(|m| m.contains("unknown font")), "{:?}", out.messages());
+        let da = crate::world::schriften_vorhanden(&["New Computer Modern".into(), "Gibt es nicht".into()]);
+        assert_eq!(da, [true, false]);
+    }
+
     /// Die Regeln aus stil.typ: Dezimalkomma, Einheiten, Formelnummern und
     /// Farben, die nur in ihrem Bereich gelten. Die Prüfungen laufen in Typst.
     #[test]
@@ -562,3 +595,4 @@ mod fixture {
         std::fs::write(std::env::var("FIXTURE_OUT").unwrap(), json.to_string()).unwrap();
     }
 }
+

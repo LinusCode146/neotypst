@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::LazyLock;
+use std::sync::{LazyLock, RwLock};
 
 use typst::diag::FileResult;
 use typst::foundations::{Bytes, Datetime, Dict, Duration, IntoValue};
@@ -25,6 +25,33 @@ pub static FONTS: LazyLock<FontStore> = LazyLock::new(|| {
     store.extend(fonts::embedded());
     store
 });
+
+/// Gewählte Dokumentschrift aus den Einstellungen: Textschriften (mit Komma
+/// getrennt, die erste vorhandene gilt) und Formelschrift. `None` = Standard
+/// von stil.typ. Gilt für alle Welten, auch die Vorschauen der Vorlagen.
+static SCHRIFT: RwLock<Option<(String, String)>> = RwLock::new(None);
+
+pub fn set_schrift(schrift: Option<(String, String)>) {
+    // Nur vorhandene Familien weitergeben: Typst warnt bei jeder unbekannten,
+    // auch wenn eine andere aus der Liste passt. Fehlt die Formelschrift, gilt
+    // die von stil.typ.
+    let schrift = schrift.and_then(|(text, formeln)| {
+        let familien: Vec<String> = text.split(',').map(|f| f.trim().to_string()).filter(|f| !f.is_empty()).collect();
+        let da = schriften_vorhanden(&familien);
+        let text: Vec<String> = familien.into_iter().zip(da).filter(|(_, d)| *d).map(|(f, _)| f).collect();
+        if text.is_empty() {
+            return None;
+        }
+        let formeln = if schriften_vorhanden(std::slice::from_ref(&formeln))[0] { formeln } else { String::new() };
+        Some((text.join(", "), formeln))
+    });
+    *SCHRIFT.write().unwrap_or_else(|e| e.into_inner()) = schrift;
+}
+
+/// Welche der genannten Schriftfamilien installiert oder eingebaut sind.
+pub fn schriften_vorhanden(familien: &[String]) -> Vec<bool> {
+    familien.iter().map(|f| FONTS.book().select_family(&f.to_lowercase()).next().is_some()).collect()
+}
 
 /// Common `@preview` packages (CeTZ, Fletcher, Lilaq, Physica, Zero, …) ship
 /// inside the app, so they work offline from the first use. See
@@ -95,6 +122,13 @@ static PACKAGES: LazyLock<SystemPackages> = LazyLock::new(|| {
     )
 });
 
+/// Bereitet Pakete und Schriften im Hintergrund vor (beim App-Start), damit
+/// das erste Kompilieren nicht darauf wartet.
+pub fn vorbereiten() {
+    LazyLock::force(&FONTS);
+    LazyLock::force(&PACKAGES);
+}
+
 /// Loads project files from disk, but prefers in-memory editor buffers.
 pub struct ProjectFiles {
     project: FsRoot,
@@ -115,6 +149,7 @@ impl FileLoader for ProjectFiles {
 
 pub struct EditorWorld {
     root: PathBuf,
+    solutions: bool,
     main: FileId,
     library: LazyHash<Library>,
     files: FileStore<ProjectFiles>,
@@ -126,6 +161,7 @@ impl EditorWorld {
         let root = root.canonicalize().map_err(|e| e.to_string())?;
         Ok(Self {
             main: file_id(main)?,
+            solutions: false,
             library: LazyHash::new(build_library(false)),
             files: FileStore::new(ProjectFiles {
                 project: FsRoot::new(root.clone()),
@@ -147,7 +183,13 @@ impl EditorWorld {
 
     /// Switches `sys.inputs.loesungen` (used by the worksheet templates).
     pub fn set_solutions(&mut self, on: bool) {
+        self.solutions = on;
         self.library = LazyHash::new(build_library(on));
+    }
+
+    /// Nach einer geänderten Dokumentschrift die Eingaben neu setzen.
+    pub fn refresh_inputs(&mut self) {
+        self.library = LazyHash::new(build_library(self.solutions));
     }
 
     /// Replaces the in-memory content of a project file.
@@ -200,6 +242,13 @@ fn build_library(solutions: bool) -> Library {
     let mut inputs = Dict::new();
     inputs.insert("loesungen".into(), (if solutions { "true" } else { "false" }).into_value());
     inputs.insert("editor".into(), "neotypst".into_value());
+    // Von stil.typ gelesen, wenn im Dokument keine `schrift` angegeben ist.
+    if let Some((text, formeln)) = SCHRIFT.read().unwrap_or_else(|e| e.into_inner()).as_ref() {
+        inputs.insert("neotypst-schrift".into(), text.as_str().into_value());
+        if !formeln.is_empty() {
+            inputs.insert("neotypst-formeln".into(), formeln.as_str().into_value());
+        }
+    }
     Library::builder().with_inputs(inputs).build()
 }
 
