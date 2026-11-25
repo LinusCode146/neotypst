@@ -122,7 +122,7 @@ Regeln:
 
 ## 6 Code, Tabellen, Abbildungen
 
-- Code in ` ```python … ``` ` erscheint grau hinterlegt in Menlo.
+- Code in ` ```python … ``` ` erscheint grau hinterlegt in DejaVu Sans Mono (wie Menlo).
 - Tabellen mit dünnen grauen Linien; Kopfzeile über `table.header[*…*]`.
 - Abbildungen mit `#figure(…, caption: [...])`, wenn im Text auf sie verwiesen wird. Sonst reicht `#image(…)`.
 

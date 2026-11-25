@@ -443,6 +443,7 @@ mod tests {
 #show: stil
 #context assert.eq(text.font.first(), "libertinus serif")
 $ x $
+`code`
 #[
   #show: stil.with(schrift: "DejaVu Sans Mono")
   #context assert.eq(text.font.first(), "dejavu sans mono")

@@ -27,6 +27,7 @@ templates/hausaufgabe.typ d8a6015b1eaf7b3b
 templates/hausaufgabe.typ efae727233a03385
 templates/stil.typ 17841171d3dbc35e
 templates/stil.typ 513067d628b1313e
+templates/stil.typ 990f10160371291e
 templates/stil.typ a651bbb6c97fc2e6
 templates/stil.typ ab31bb6b0e157d12
 templates/stil.typ b14fa6fc5d25810f

@@ -464,7 +464,9 @@
   // Code
   // Code in fester Größe relativ zur Grundgröße: Typst verkleinert raw
   // ohnehin auf 0,8 em, und neben Libron wirkte Code sonst zu klein.
-  show raw: set text(font: ("Menlo", "DejaVu Sans Mono"), size: groesse * if ak { 0.82 } else { 0.8 })
+  // DejaVu Sans Mono ist in Typst eingebaut und die Grundlage von Menlo.
+  // Eine Liste mit Menlo würde unter Windows bei jedem Kompilieren warnen.
+  show raw: set text(font: "DejaVu Sans Mono", size: groesse * if ak { 0.82 } else { 0.8 })
   show raw.where(block: true): set par(justify: false)
   show raw.where(block: true): if ak {
     // Akademisch und schlicht: weder Linien noch Fläche, nur Abstand.
