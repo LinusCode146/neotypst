@@ -10,6 +10,7 @@ export type Settings = {
   zoom: number; // preview zoom, 1 = fit width
   spell: "auto" | "de" | "en" | "off";
   mathQuote: boolean; // auto-quote unknown words in formulas
+  schrift: string; // Dokumentschrift, id aus schriften.ts
 };
 
 const DEFAULTS: Settings = {
@@ -22,6 +23,7 @@ const DEFAULTS: Settings = {
   zoom: 1,
   spell: "auto",
   mathQuote: true,
+  schrift: "latex",
 };
 
 const KEY = "neotypst.settings";

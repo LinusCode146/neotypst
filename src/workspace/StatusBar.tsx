@@ -15,6 +15,8 @@ export function StatusBar(p: {
   dirty: boolean;
   onToggleProblems(): void;
   onSpellMenu(anchor: DOMRect): void;
+  schrift: string;
+  onSchriftMenu(anchor: DOMRect): void;
 }) {
   const errors = p.diags.filter((d) => d.severity === "error");
   const warnings = p.diags.filter((d) => d.severity === "warning");
@@ -35,6 +37,16 @@ export function StatusBar(p: {
         {p.pageCount} Seite{p.pageCount === 1 ? "" : "n"}
       </span>
       <span className="grow" />
+      <button
+        className="item"
+        title="Dokumentschrift für Vorschau und PDF"
+        onClick={(e) => {
+          e.stopPropagation();
+          p.onSchriftMenu((e.currentTarget as HTMLElement).getBoundingClientRect());
+        }}
+      >
+        Schrift: {p.schrift}
+      </button>
       <button
         className="item spell-item"
         title={`Rechtschreibung: Sprache wählen (${keyLabel("mod+alt+l")} wechselt)`}

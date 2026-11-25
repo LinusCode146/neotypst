@@ -1,4 +1,4 @@
-// neotypst-stil 0.6.0
+// neotypst-stil 0.7.0
 // Hausaufgaben-Abgabe, aufgebaut auf stil.typ:
 // Aufgabenstellung im grauen Kasten, darunter deine Lösung.
 

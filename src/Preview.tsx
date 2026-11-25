@@ -1,6 +1,7 @@
 import { forwardRef, memo, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
 
-export type PageView = { hash: string; svg: string; width: number; height: number };
+/** Eine Seite als Bild-URL; leer, solange sie noch nicht gerendert ist. */
+export type PageView = { hash: string; src: string; width: number; height: number };
 export type Marker = { page: number; x: number; y: number; key: number };
 
 export type PreviewHandle = {
@@ -22,14 +23,14 @@ type Props = {
 const PADDING = 56;
 
 const Page = memo(function Page({
-  svg,
+  src,
   width,
   height,
   index,
   pxWidth,
   onClick,
 }: {
-  svg: string;
+  src: string;
   width: number;
   height: number;
   index: number;
@@ -46,7 +47,7 @@ const Page = memo(function Page({
         onClick(index, ((e.clientX - r.left) / r.width) * width, ((e.clientY - r.top) / r.height) * height);
       }}
     >
-      <div className="svg-host" dangerouslySetInnerHTML={{ __html: svg }} />
+      {src && <img className="page-img" src={src} alt="" draggable={false} decoding="async" />}
       <div className="page-number">{index + 1}</div>
     </div>
   );
@@ -233,7 +234,7 @@ export const Preview = forwardRef<PreviewHandle, Props>(function Preview({ pages
         <div className="preview-pages" style={{ width: maxPt * scale }}>
           {pages.map((p, i) => (
             <div key={i} style={{ position: "relative" }}>
-              <Page svg={p.svg} width={p.width} height={p.height} index={i} pxWidth={p.width * scale} onClick={onClick} />
+              <Page src={p.src} width={p.width} height={p.height} index={i} pxWidth={p.width * scale} onClick={onClick} />
               {marker && marker.page === i && (
                 <div key={marker.key} className="cursor-marker" style={{ left: marker.x * scale, top: marker.y * scale }} />
               )}

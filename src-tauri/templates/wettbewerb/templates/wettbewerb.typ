@@ -1,4 +1,4 @@
-// neotypst-stil 0.6.0
+// neotypst-stil 0.7.0
 // Lösungen für Wettbewerbe (z. B. Mathe-/Physik-Olympiade, Bundeswettbewerb),
 // aufgebaut auf stil.typ.
 

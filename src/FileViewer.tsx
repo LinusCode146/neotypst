@@ -20,8 +20,6 @@ const MIME: Record<string, string> = {
 /** Auflösung, mit der PDF-Seiten gerendert werden (Pixel je Punkt). */
 const RENDER_SCALE = 3;
 
-const img = (src: string) => `<img src="${src}" alt="" draggable="false">`;
-
 function imageSize(src: string): Promise<{ width: number; height: number }> {
   return new Promise((resolve, reject) => {
     const el = new Image();
@@ -64,7 +62,7 @@ export function FileViewer({ rel, kind, zoom, onZoom, onClose, onOpenExternal }:
         const ext = rel.split(".").pop()!.toLowerCase();
         const src = url(new Blob([bytes], { type: MIME[ext] ?? "application/octet-stream" }));
         const { width, height } = await imageSize(src);
-        if (!cancelled) setPages([{ hash: rel, svg: img(src), width, height }]);
+        if (!cancelled) setPages([{ hash: rel, src, width, height }]);
         return;
       }
       const pdfjs = await loadPdfjs();
@@ -74,7 +72,7 @@ export function FileViewer({ rel, kind, zoom, onZoom, onClose, onOpenExternal }:
         const all: PageView[] = [];
         for (let i = 1; i <= doc.numPages; i++) {
           const vp = (await doc.getPage(i)).getViewport({ scale: 1 });
-          all.push({ hash: `${rel}#${i}:leer`, svg: "", width: vp.width, height: vp.height });
+          all.push({ hash: `${rel}#${i}:leer`, src: "", width: vp.width, height: vp.height });
         }
         if (cancelled) return;
         setPages([...all]);
@@ -89,7 +87,7 @@ export function FileViewer({ rel, kind, zoom, onZoom, onClose, onOpenExternal }:
           const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/png"));
           page.cleanup();
           if (cancelled || !blob) break;
-          all[i - 1] = { ...all[i - 1], hash: `${rel}#${i}`, svg: img(url(blob)) };
+          all[i - 1] = { ...all[i - 1], hash: `${rel}#${i}`, src: url(blob) };
           setPages([...all]);
         }
       } finally {

@@ -1,4 +1,4 @@
-// neotypst-stil 0.6.0
+// neotypst-stil 0.7.0
 // Essay, aufgebaut auf stil.typ: Deckblatt mit Fragestellung und Angaben,
 // danach nur Text. Nichts fett, nichts farbig.
 

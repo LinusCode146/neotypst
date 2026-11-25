@@ -8,6 +8,7 @@ import { GRAPHICS, type GraphicBlock } from "../graphics";
 import { Icon } from "../icons";
 import { setSettings, type Settings } from "../settings";
 import { checkForUpdate } from "../updater";
+import { SCHRIFTEN } from "../schriften";
 import type { Command } from "./commands";
 
 export const SPELL_MODES = ["auto", "de", "en", "off"] as const;
@@ -219,6 +220,15 @@ export function buildCommands(ctx: CommandContext, files: Command[]): Command[] 
     run: () => setSettings({ [key]: !settings[key] }),
   });
   const prefs: Command[] = [
+    ...SCHRIFTEN.map((s) => ({
+      id: "schrift-" + s.id,
+      label: `Dokumentschrift: ${s.label}${settings.schrift === s.id ? " ✓" : ""}`,
+      detail: s.detail || undefined,
+      keywords: "schrift schriftart font dokument pdf " + s.familien.join(" "),
+      group: "Einstellungen",
+      icon: <Icon.settings />,
+      run: () => setSettings({ schrift: s.id }),
+    })),
     ...SPELL_MODES.map((m) => ({
       id: "spell-" + m,
       label: `Rechtschreibung: ${spellLabel(m)}${settings.spell === m ? " ✓" : ""}`,

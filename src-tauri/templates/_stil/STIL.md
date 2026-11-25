@@ -26,7 +26,7 @@ Die eingebauten NeoTypst-Vorlagen (Arbeitsblatt, Hausaufgabe, Wettbewerb, Dokume
 |---|---|---|
 | `akzent` | `black` | `akzent: rgb("#2b50c8")` |
 | `kasten` | `luma(244)` (Hellgrau) | `kasten: rgb("#f3f1ec")` |
-| `schrift` | `"New Computer Modern"` | `schrift: "Charter"`, `schrift: "Libron"` |
+| `schrift` | in NeoTypst gewählte Dokumentschrift, sonst `"New Computer Modern"` | `schrift: "Charter"`, `schrift: "Libron"` |
 | `groesse` | `12pt` | `groesse: 11pt` |
 | `formeln` | `"New Computer Modern Math"` | |
 | `rand` | `(x: 2.2cm, y: 2cm)` | `rand: 2.5cm` |

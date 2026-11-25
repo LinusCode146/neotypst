@@ -1,4 +1,4 @@
-// neotypst-stil 0.6.0
+// neotypst-stil 0.7.0
 // stil – einheitlicher Stil für Arbeitsblätter, Hausaufgaben und Lab-Protokolle.
 //
 //   #import "@local/stil:0.1.0": *
@@ -391,23 +391,33 @@
 /// - profil: "klassisch" (Standard), "akademisch" oder "schlicht" (siehe STIL.md, Abschnitt 6)
 /// - akzent: Farbe für Aufgabenköpfe und Teilaufgaben
 /// - kasten: Hintergrund der Aufgabenstellung (im Profil „akademisch“ keiner)
-/// - schrift: Textschrift, Standard ist die LaTeX-Schrift; z. B. "Charter" oder "Libron"
+/// - schrift: Textschrift, z. B. "Charter" oder "Libron". Ohne Angabe die in
+///   NeoTypst gewählte Dokumentschrift, sonst die LaTeX-Schrift.
 /// - groesse: Grundgröße des Textes (klassisch 12 pt, akademisch 11 pt)
-/// - formeln: Schrift für Formeln
+/// - formeln: Schrift für Formeln (ohne Angabe wie bei schrift)
 /// - rand: Seitenränder (akademisch: Satzspiegel für etwa 75 Zeichen pro Zeile)
 #let stil(
   profil: "klassisch",
   akzent: black,
   kasten: auto,
-  schrift: "New Computer Modern",
+  schrift: auto,
   groesse: auto,
-  formeln: "New Computer Modern Math",
+  formeln: auto,
   rand: auto,
   body,
 ) = {
   assert(profil in ("klassisch", "akademisch", "schlicht"), message: "stil: profil ist \"klassisch\", \"akademisch\" oder \"schlicht\"")
   // „schlicht“ übernimmt alles von „akademisch“ bis auf die Linien.
   let ak = profil in ("akademisch", "schlicht")
+  // Dokumentschrift aus den NeoTypst-Einstellungen: "Palatino, Palatino Linotype".
+  let gewaehlt = sys.inputs.at("neotypst-schrift", default: none)
+  let schriften = if schrift != auto { (schrift,) } else if gewaehlt != none {
+    gewaehlt.split(",").map(str.trim)
+  } else { ("New Computer Modern",) }
+  let schrift = schriften.first()
+  let formeln = if formeln != auto { formeln } else {
+    sys.inputs.at("neotypst-formeln", default: "New Computer Modern Math")
+  }
   let kasten = if kasten != auto { kasten } else if ak { none } else { luma(244) }
   let groesse = if groesse != auto { groesse } else if ak { 11pt } else { 12pt }
   let rand = if rand != auto { rand } else if ak { (x: 3.2cm, top: 2.7cm, bottom: 3.2cm) } else { (x: 2.2cm, y: 2cm) }
@@ -419,7 +429,7 @@
 
   set page(paper: "a4", margin: rand, numbering: if ak { "1" } else { none })
   set text(
-    font: (schrift, "New Computer Modern"),
+    font: (..schriften, "New Computer Modern"),
     size: groesse * faktor,
     lang: "de",
     region: "DE",

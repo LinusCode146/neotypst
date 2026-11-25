@@ -7,6 +7,7 @@ import { api, type FileEntry, type OpenedProject } from "../api";
 import type { EditorHandle } from "../editor/Editor";
 import type { TreeActions } from "../FileTree";
 import type { Menu, Toast } from "./types";
+import type { PageCache } from "./useCompile";
 
 export function useFileActions({
   project,
@@ -38,7 +39,7 @@ export function useFileActions({
   flushSave(): Promise<void>;
   refreshFiles(): Promise<void>;
   requestCompile(): void;
-  svgCache: RefObject<Map<string, string>>;
+  svgCache: RefObject<PageCache>;
   showToast(t: Toast, ms?: number): void;
   setMenu(m: Menu | null): void;
   insertImages(rels: string[]): void;

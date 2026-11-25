@@ -1,4 +1,4 @@
-// neotypst-stil 0.6.0
+// neotypst-stil 0.7.0
 // Arbeitsblatt-Bausteine, aufgebaut auf stil.typ.
 // Lösungen werden über den Schalter „Lösungen“ im Editor ein- und
 // ausgeblendet (sys.inputs.loesungen).

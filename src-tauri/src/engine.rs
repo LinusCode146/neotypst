@@ -135,6 +135,9 @@ impl CompileOut {
             .map(|d| format!("{} ({:?}:{:?})", d.message, d.file, d.line))
             .collect()
     }
+    pub fn messages(&self) -> Vec<String> {
+        self.diagnostics.iter().map(|d| d.message.clone()).collect()
+    }
     pub fn page_count(&self) -> usize {
         self.pages.as_ref().map(|p| p.len()).unwrap_or(0)
     }
@@ -184,6 +187,15 @@ impl Engine {
         s.solutions = on;
         s.world.set_solutions(on);
         Ok(())
+    }
+
+    /// Dokumentschrift für alle Kompilierungen; leer = Standard von stil.typ.
+    pub fn set_schrift(&mut self, text: String, formeln: String) {
+        crate::world::set_schrift(if text.trim().is_empty() { None } else { Some((text, formeln)) });
+        if let Some(s) = self.session.as_mut() {
+            s.world.refresh_inputs();
+            s.sent.clear();
+        }
     }
 
     pub fn forget_preview(&mut self) -> Result<(), String> {

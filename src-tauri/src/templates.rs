@@ -431,6 +431,37 @@ mod tests {
         }
     }
 
+    /// Die Dokumentschrift aus den Einstellungen gilt, solange das Dokument
+    /// keine eigene `schrift` setzt.
+    #[test]
+    fn dokumentschrift() {
+        let dir = std::env::temp_dir().join("neotypst-dokumentschrift-test");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("templates")).unwrap();
+        std::fs::write(dir.join("templates/stil.typ"), STIL.1).unwrap();
+        let main = r#"#import "templates/stil.typ": *
+#show: stil
+#context assert.eq(text.font.first(), "palatino")
+$ x $
+#[
+  #show: stil.with(schrift: "Libron")
+  #context assert.eq(text.font.first(), "libron")
+]
+"#;
+        std::fs::write(dir.join("main.typ"), main).unwrap();
+        let mut engine = Engine::new();
+        engine.open(dir, "main.typ".into()).unwrap();
+        engine.set_schrift("Gibt es nicht, Palatino, Palatino Linotype".into(), "Libertinus Math".into());
+        let out = engine.compile(None, None);
+        engine.set_schrift(String::new(), String::new());
+        let out = out.unwrap();
+        assert!(out.errors().is_empty(), "{:?}", out.errors());
+        // Fehlende Ersatzfamilien (Palatino Linotype auf dem Mac) warnen nicht.
+        assert!(!out.messages().iter().any(|m| m.contains("unknown font")), "{:?}", out.messages());
+        let da = crate::world::schriften_vorhanden(&["New Computer Modern".into(), "Gibt es nicht".into()]);
+        assert_eq!(da, [true, false]);
+    }
+
     /// Die Regeln aus stil.typ: Dezimalkomma, Einheiten, Formelnummern und
     /// Farben, die nur in ihrem Bereich gelten. Die Prüfungen laufen in Typst.
     #[test]
@@ -562,3 +593,4 @@ mod fixture {
         std::fs::write(std::env::var("FIXTURE_OUT").unwrap(), json.to_string()).unwrap();
     }
 }
+
