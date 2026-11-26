@@ -73,6 +73,17 @@ fn create_project(name: String, template: String, fields: Vec<(String, String)>)
     project::create_project(&name, &template, &fields)
 }
 
+#[tauri::command]
+fn rename_project(path: String, name: String) -> Result<String, String> {
+    project::rename_project(&path, &name)
+}
+
+/// Legt ein ganzes Projekt in den Papierkorb (von der Startseite aus).
+#[tauri::command]
+fn trash_project(path: String) -> Result<String, String> {
+    project::trash_project(&path)
+}
+
 #[derive(serde::Serialize)]
 struct OpenedProject {
     root: String,
@@ -452,6 +463,8 @@ pub fn run() {
             list_projects,
             list_templates,
             create_project,
+            rename_project,
+            trash_project,
             open_project,
             close_project,
             list_files,
