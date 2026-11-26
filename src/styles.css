@@ -3169,3 +3169,56 @@ kbd.on-primary {
   width: 12px;
   height: 12px;
 }
+
+/* Startseite: Projekte neu einlesen, umbenennen, löschen */
+.recent-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.recent-reload {
+  width: 24px;
+  height: 24px;
+  color: var(--muted);
+}
+.recent-reload svg {
+  width: 14px;
+  height: 14px;
+}
+.recent-reload.spinning svg {
+  animation: drehen 0.6s linear infinite;
+}
+@keyframes drehen {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .recent-reload.spinning svg {
+    animation: none;
+  }
+}
+.recent-row.renaming input {
+  min-width: 0;
+  border: 0;
+  border-bottom: 1px solid var(--accent);
+  background: transparent;
+  outline: none;
+  padding: 0;
+  color: var(--text);
+}
+.btn.danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+:root[data-theme="dark"] .btn.danger {
+  color: #1b1b1b;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .btn.danger {
+    color: #1b1b1b;
+  }
+}

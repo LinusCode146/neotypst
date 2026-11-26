@@ -28,18 +28,29 @@ const exists = (p: string) => files.some((f) => f.path === p);
 const under = (p: string, dir: string) => p === dir || p.startsWith(dir + "/");
 const trash = new Map<string, { path: string; kind: string }[]>();
 
+let projekte = [
+  { name: "Physik Blatt 3 – Kinematik", path: "/p/1", modified: now - 600, files: 6 },
+  { name: "Analysis Hausaufgabe 5", path: "/p/2", modified: now - 86400 * 2, files: 3 },
+  { name: "Doku Sortieralgorithmen", path: "/p/3", modified: now - 86400 * 9, files: 12 },
+];
+
 const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
   projects_dir: () => "/Users/du/Documents/Typst",
-  list_projects: () => [
-    { name: "Physik Blatt 3 – Kinematik", path: "/p/1", modified: now - 600, files: 6 },
-    { name: "Analysis Hausaufgabe 5", path: "/p/2", modified: now - 86400 * 2, files: 3 },
-    { name: "Doku Sortieralgorithmen", path: "/p/3", modified: now - 86400 * 9, files: 12 },
-  ],
+  list_projects: () => projekte.map((p) => ({ ...p })),
   list_templates: () => (fixture as unknown as { templates: unknown }).templates ?? templates,
   template_preview: ({ id }) => (fixture as unknown as { previews: Record<string, string> }).previews[id as string] ?? "",
   templates_dir: () => "/Users/du/Documents/Typst/_Vorlagen",
   save_as_template: () => "/Users/du/Documents/Typst/_Vorlagen/x",
   create_project: () => "/p/new",
+  rename_project: ({ path, name }) => {
+    const p = projekte.find((x) => x.path === path);
+    if (p) p.name = name as string;
+    return path;
+  },
+  trash_project: ({ path }) => {
+    projekte = projekte.filter((x) => x.path !== path);
+    return "";
+  },
   open_project: () => ({ root: "/p/1", name: "Physik Blatt 3 – Kinematik", main: "main.typ", files }),
   close_project: () => null,
   list_files: () => files,

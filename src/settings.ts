@@ -86,3 +86,11 @@ export function schriftVon(s: Settings, root: string): string {
 export function setProjektSchrift(root: string, id: string) {
   setSettings({ projektSchrift: { ...current.projektSchrift, [projektKey(root)]: id } });
 }
+
+/** Nach dem Umbenennen eines Projektordners: die Schriftwahl zieht mit. */
+export function projektVerschoben(alt: string, neu: string) {
+  const a = projektKey(alt);
+  if (!(a in current.projektSchrift)) return;
+  const { [a]: id, ...rest } = current.projektSchrift;
+  setSettings({ projektSchrift: { ...rest, [projektKey(neu)]: id } });
+}
