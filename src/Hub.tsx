@@ -5,6 +5,8 @@ import { api, type ProjektStil, type ProjectInfo, type Template } from "./api";
 import { StilAlleDialog } from "./StilDialog";
 import { Icon } from "./icons";
 import { kbd, modKey } from "./platform";
+import { setSettings, useSettings } from "./settings";
+import { SCHRIFTEN, schriftAnwenden } from "./schriften";
 
 /** Schematic page previews for the template cards. */
 export function TemplateThumb({ id }: { id: string }) {
@@ -147,41 +149,43 @@ function initialValues(t: Template | undefined): Record<string, string> {
   return v;
 }
 
-export function NewProjectDialog({
-  templates,
-  initial,
-  onClose,
-  onCreated,
-}: {
-  templates: Template[];
-  initial: string;
-  onClose(): void;
-  onCreated(path: string): void;
-}) {
-  const [tplId, setTplId] = useState(initial);
+const PROFILE = ["klassisch", "akademisch", "schlicht"] as const;
+
+/** „Neues Blatt“: Vorlage wählen, Kopf ausfüllen, Satz einstellen, anlegen. */
+function NewSheet({ templates, onCreated, focusKey }: { templates: Template[]; onCreated(path: string): void; focusKey: number }) {
+  const settings = useSettings();
+  const [tplId, setTplId] = useState("arbeitsblatt");
   const tpl = templates.find((t) => t.id === tplId) ?? templates[0];
   const [values, setValues] = useState<Record<string, string>>(() => initialValues(tpl));
+  const [profil, setProfil] = useState<(typeof PROFILE)[number]>("klassisch");
   const [folder, setFolder] = useState("");
   const [folderEdited, setFolderEdited] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const firstInput = useRef<HTMLInputElement>(null);
 
+  // Erst wenn die Vorlagen geladen sind, stehen die Felder fest.
+  const loaded = templates.length > 0;
+  useEffect(() => {
+    if (loaded) setValues(initialValues(templates.find((t) => t.id === tplId) ?? templates[0]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded]);
+
+  useEffect(() => {
+    if (focusKey > 0) firstInput.current?.focus();
+  }, [focusKey]);
+
   const pick = (id: string) => {
     setTplId(id);
     const t = templates.find((x) => x.id === id);
-    // Keep values for fields both templates share (e.g. title, name).
+    // Werte für Felder, die beide Vorlagen haben (Titel, Name), bleiben stehen.
     setValues((old) => {
       const next = initialValues(t);
-      for (const k of Object.keys(next)) if (old[k] && next[k] !== undefined && t?.fields.find((f) => f.key === k)?.kind !== "date") next[k] = old[k];
+      for (const k of Object.keys(next)) if (old[k] && t?.fields.find((f) => f.key === k)?.kind !== "date") next[k] = old[k];
       return next;
     });
     setError(null);
   };
-
-  useEffect(() => {
-    firstInput.current?.focus();
-  }, [tplId]);
 
   const titleField = tpl?.fields.find((f) => f.key === "titel");
   const suggestedFolder = (() => {
@@ -196,6 +200,7 @@ export function NewProjectDialog({
     if (!folderName.trim()) return setError("Bitte gib einen Titel oder Ordnernamen ein.");
     setBusy(true);
     const fields: [string, string][] = tpl.fields.map((f) => [f.key, f.kind === "date" ? isoToGerman(values[f.key] ?? "") : values[f.key] ?? ""]);
+    if (!tpl.user) fields.push(["profil", profil]);
     try {
       const path = await api.createProject(folderName.trim(), tpl.id, fields);
       const mem = loadMemory();
@@ -213,101 +218,134 @@ export function NewProjectDialog({
       e.preventDefault();
       create();
     }
-    if (e.key === "Escape") onClose();
   };
 
-  const groups = useMemo(() => {
-    const m = new Map<string, Template[]>();
-    for (const t of templates) m.set(t.category, [...(m.get(t.category) ?? []), t]);
-    return [...m.entries()];
-  }, [templates]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (modKey(e) && e.key === "Enter") {
+        e.preventDefault();
+        create();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
 
   return (
-    <div className="overlay" onMouseDown={onClose}>
-      <div className="dialog new-project" onMouseDown={(e) => e.stopPropagation()}>
-        <div className="np-list">
-          {groups.map(([cat, ts]) => (
-            <div key={cat}>
-              <div className="np-cat">{cat}</div>
-              {ts.map((t) => (
-                <button key={t.id} className={"np-item" + (t.id === tplId ? " selected" : "")} onClick={() => pick(t.id)} onDoubleClick={create}>
-                  <span className="np-mini">
-                    <TemplatePreview id={t.id} />
-                  </span>
-                  <span className="np-text">
-                    <b>{t.name}</b>
-                    <span>{t.description || (t.user ? "Eigene Vorlage" : "")}</span>
-                  </span>
-                </button>
-              ))}
-            </div>
-          ))}
-        </div>
-        <div className="np-main">
-          <div className="np-preview">
-            {tpl && <TemplatePreview id={tpl.id} />}
-          </div>
-          <div className="np-form">
-            <h2>{tpl?.name ?? "Neues Projekt"}</h2>
-            {tpl?.fields.map((f, i) => (
-              <div className="field" key={tpl.id + f.key}>
-                <label htmlFor={"f-" + f.key}>
-                  {f.label}
-                  {f.remember && <span className="remember" title="Wird fürs nächste Projekt gemerkt">gemerkt</span>}
-                </label>
-                <input
-                  id={"f-" + f.key}
-                  ref={i === 0 ? firstInput : undefined}
-                  type={f.kind === "date" ? "date" : "text"}
-                  list={f.kind === "choice" ? "opts-" + f.key : undefined}
-                  placeholder={f.default || f.placeholder}
-                  value={values[f.key] ?? ""}
-                  onChange={(e) => {
-                    setValues((v) => ({ ...v, [f.key]: e.target.value }));
-                    setError(null);
-                  }}
-                  onKeyDown={onKey}
-                />
-                {f.kind === "choice" && (
-                  <datalist id={"opts-" + f.key}>
-                    {f.options.map((o) => (
-                      <option key={o} value={o} />
-                    ))}
-                  </datalist>
-                )}
-              </div>
-            ))}
-            <div className="field folder-field">
-              <label htmlFor="f-folder">Ordner</label>
-              <div className="folder-input">
-                <span>Typst/</span>
-                <input
-                  id="f-folder"
-                  value={folderName}
-                  onChange={(e) => {
-                    setFolder(e.target.value);
-                    setFolderEdited(true);
-                    setError(null);
-                  }}
-                  onKeyDown={onKey}
-                />
-              </div>
-            </div>
-            {error && <div className="form-error">{error}</div>}
-          </div>
-          <div className="dialog-foot">
-            <span className="dim">Leere Felder bekommen den grauen Vorschlag.</span>
-            <div className="grow" />
-            <button className="btn" onClick={onClose}>
-              Abbrechen
-            </button>
-            <button className="btn primary" onClick={create} disabled={busy}>
-              Erstellen <kbd style={{ background: "transparent", color: "inherit", borderColor: "rgba(255,255,255,.35)" }}>↩</kbd>
-            </button>
-          </div>
-        </div>
+    <section className="sheet">
+      <div className="sheet-head">
+        <h1>Neues Blatt</h1>
+        <span>alles lässt sich später ändern</span>
       </div>
-    </div>
+
+      <h2 className="sheet-sec">
+        <span>1</span>Vorlage
+        <button className="link" onClick={() => api.templatesDir().then(revealItemInDir)}>
+          Eigene Vorlagen
+        </button>
+      </h2>
+      <div className="sheet-tpls">
+        {templates.map((t) => (
+          <button
+            key={t.id}
+            className={"sheet-tpl" + (t.id === tpl?.id ? " on" : "")}
+            onClick={() => pick(t.id)}
+            onDoubleClick={create}
+            title={t.description}
+          >
+            <span className="thumb">
+              <TemplatePreview id={t.id} />
+            </span>
+            <b>{t.name}</b>
+            <span className="cat">{t.user ? "eigene" : t.category}</span>
+          </button>
+        ))}
+      </div>
+
+      <h2 className="sheet-sec">
+        <span>2</span>Kopf
+      </h2>
+      <div className="sheet-fields">
+        {tpl?.fields.map((f, i) => (
+          <label key={tpl.id + f.key} className={"sheet-field" + (f.key === "titel" ? " wide" : "")}>
+            <span>{f.label}</span>
+            <input
+              ref={i === 0 ? firstInput : undefined}
+              type={f.kind === "date" ? "date" : "text"}
+              list={f.kind === "choice" ? "opts-" + f.key : undefined}
+              placeholder={f.default || f.placeholder}
+              value={values[f.key] ?? ""}
+              onChange={(e) => {
+                setValues((v) => ({ ...v, [f.key]: e.target.value }));
+                setError(null);
+              }}
+              onKeyDown={onKey}
+            />
+            {f.kind === "choice" && (
+              <datalist id={"opts-" + f.key}>
+                {f.options.map((o) => (
+                  <option key={o} value={o} />
+                ))}
+              </datalist>
+            )}
+          </label>
+        ))}
+      </div>
+
+      <h2 className="sheet-sec">
+        <span>3</span>Satz
+      </h2>
+      <div className="sheet-satz">
+        {!tpl?.user && (
+          <div className="sheet-choice" role="radiogroup" aria-label="Stilprofil">
+            <span className="lbl">Profil</span>
+            {PROFILE.map((p) => (
+              <button key={p} role="radio" aria-checked={profil === p} className={profil === p ? "on" : ""} onClick={() => setProfil(p)}>
+                {p}
+              </button>
+            ))}
+          </div>
+        )}
+        <label className="sheet-choice">
+          <span className="lbl">Schrift</span>
+          <select
+            value={settings.schrift}
+            onChange={(e) => {
+              setSettings({ schrift: e.target.value });
+              schriftAnwenden(e.target.value).catch(() => {});
+            }}
+          >
+            {SCHRIFTEN.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+          <span className="hint">gilt für alle Projekte</span>
+        </label>
+      </div>
+
+      <div className="sheet-foot">
+        <label className="sheet-folder">
+          <span>Typst/</span>
+          <input
+            aria-label="Ordnername"
+            value={folderName}
+            onChange={(e) => {
+              setFolder(e.target.value);
+              setFolderEdited(true);
+              setError(null);
+            }}
+            onKeyDown={onKey}
+          />
+        </label>
+        {error && <span className="form-error">{error}</span>}
+        <div className="grow" />
+        <button className="btn primary big" onClick={create} disabled={busy || !tpl}>
+          Blatt anlegen <kbd className="on-primary">{kbd("⌘↩")}</kbd>
+        </button>
+      </div>
+    </section>
   );
 }
 
@@ -315,12 +353,13 @@ export function Hub({ onOpen }: { onOpen(path: string): void }) {
   const [projects, setProjects] = useState<ProjectInfo[] | null>(null);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [dir, setDir] = useState("");
-  const [dialog, setDialog] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [stil, setStil] = useState<ProjektStil[]>([]);
   const [stilOpen, setStilOpen] = useState(false);
-  const veraltet = stil.filter((p) => p.veraltet.length > 0);
+  const [focusNew, setFocusNew] = useState(0);
+  const search = useRef<HTMLInputElement>(null);
+  const veraltet = useMemo(() => new Set(stil.filter((p) => p.veraltet.length > 0).map((p) => p.path)), [stil]);
 
   useEffect(() => {
     api.listProjects().then(setProjects).catch((e) => setError(String(e)));
@@ -333,11 +372,15 @@ export function Hub({ onOpen }: { onOpen(path: string): void }) {
     const onKey = (e: KeyboardEvent) => {
       if (modKey(e) && e.key === "n") {
         e.preventDefault();
-        setDialog("arbeitsblatt");
+        setFocusNew((n) => n + 1);
       }
       if (modKey(e) && e.key === "o") {
         e.preventDefault();
         openFolder();
+      }
+      if (modKey(e) && e.key === "k") {
+        e.preventDefault();
+        search.current?.focus();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -353,83 +396,81 @@ export function Hub({ onOpen }: { onOpen(path: string): void }) {
     () => (projects ?? []).filter((p) => p.name.toLowerCase().includes(query.toLowerCase())),
     [projects, query],
   );
+  const anyOld = filtered.some((p) => veraltet.has(p.path));
 
   return (
     <div className="hub">
       <div className="hub-drag" data-tauri-drag-region />
-      <div className="hub-inner">
-        <div className="hub-header">
-          <div>
-            <div className="wordmark">NeoTypst</div>
-            <p className="sub">Typst für Arbeitsblätter, Aufgaben und Dokumentationen</p>
-          </div>
-          <div className="grow" />
-          <button className="btn" onClick={openFolder}>
-            <Icon.folderOpen /> Ordner öffnen <kbd>{kbd("⌘O")}</kbd>
-          </button>
-          <button className="btn primary" onClick={() => setDialog("arbeitsblatt")}>
-            <Icon.plus /> Neues Projekt <kbd style={{ background: "transparent", color: "inherit", borderColor: "rgba(255,255,255,.35)" }}>{kbd("⌘N")}</kbd>
-          </button>
-        </div>
+      <header className="hub-header" data-tauri-drag-region>
+        <div className="wordmark">NeoTypst</div>
+        <div className="grow" data-tauri-drag-region />
+        <label className="hub-search">
+          <Icon.search />
+          <input
+            ref={search}
+            placeholder="Projekte durchsuchen"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && filtered[0]) onOpen(filtered[0].path);
+              if (e.key === "Escape") setQuery("");
+            }}
+          />
+          <kbd>{kbd("⌘K")}</kbd>
+        </label>
+        <button className="btn" onClick={openFolder}>
+          Ordner öffnen <kbd>{kbd("⌘O")}</kbd>
+        </button>
+      </header>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <h3 style={{ flex: 1 }}>Neu aus Vorlage</h3>
-          <button className="btn ghost" style={{ marginTop: 18, color: "var(--muted)" }} onClick={() => api.templatesDir().then(revealItemInDir)}>
-            <Icon.folder /> Eigene Vorlagen
-          </button>
-        </div>
-        <div className="template-strip">
-          {templates.map((t) => (
-            <button key={t.id} className="tpl-card" onClick={() => setDialog(t.id)}>
-              <div className="thumb">
-                <TemplatePreview id={t.id} />
-              </div>
-              <div className="meta">
-                <span className="cat">{t.category}</span>
-                <b>{t.name}</b>
-                <span>{t.description}</span>
-              </div>
-            </button>
-          ))}
-        </div>
+      <main className="hub-main">
+        <NewSheet templates={templates} onCreated={onOpen} focusKey={focusNew} />
 
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <h3 style={{ flex: 1 }}>Projekte</h3>
-          {veraltet.length > 0 && (
-            <button className="btn ghost small" title="Ersetzt unveränderte ältere Kopien von stil.typ und den Vorlagen" onClick={() => setStilOpen(true)}>
-              <Icon.bolt /> Stil in {veraltet.length === 1 ? "1 Projekt" : `${veraltet.length} Projekten`} veraltet
-            </button>
-          )}
-          {projects && projects.length > 6 && (
-            <input className="hub-search" placeholder="Suchen …" value={query} onChange={(e) => setQuery(e.target.value)} />
-          )}
-        </div>
-        {error && <div className="empty-note">{error}</div>}
-        {projects && projects.length === 0 && (
-          <div className="empty-note">
-            Noch keine Projekte. Wähle oben eine Vorlage, um loszulegen.
-            <br />
-            <span style={{ fontSize: 12 }}>Projekte liegen in {dir}</span>
+        <section className="recent">
+          <div className="recent-head">
+            <h2>Weiterarbeiten</h2>
+            {projects && <span>{projects.length === 1 ? "1 Projekt" : `${projects.length} Projekte`}</span>}
           </div>
-        )}
-        {filtered.length > 0 && (
-          <div className="project-list">
-            {filtered.map((p) => (
-              <button key={p.path} className="project-row" onClick={() => onOpen(p.path)}>
-                <Icon.folder />
-                <span className="pname">{p.name}</span>
-                <span className="pmeta">{p.files} Dateien</span>
-                <span className="pmeta" style={{ width: 110, textAlign: "right" }}>
-                  {relative(p.modified)}
-                </span>
-              </button>
-            ))}
+          <div className="recent-table">
+            <div className="recent-row recent-cols">
+              <span>Projekt</span>
+              <span>Dateien</span>
+              <span>Geändert</span>
+            </div>
+            <div className="recent-body">
+              {error && <div className="empty-note">{error}</div>}
+              {projects && projects.length === 0 && <div className="empty-note">Noch keine Projekte. Links ein Blatt anlegen.</div>}
+              {projects && projects.length > 0 && filtered.length === 0 && <div className="empty-note">Kein Projekt passt zu „{query}“.</div>}
+              {filtered.map((p) => (
+                <button key={p.path} className="recent-row" onClick={() => onOpen(p.path)}>
+                  <span className="pname">
+                    {p.name}
+                    {veraltet.has(p.path) && (
+                      <sup className="dagger" title="Stil veraltet">
+                        †
+                      </sup>
+                    )}
+                  </span>
+                  <span className="num">{p.files}</span>
+                  <span className="when">{relative(p.modified)}</span>
+                </button>
+              ))}
+            </div>
           </div>
-        )}
-        {projects && projects.length > 0 && (
-          <p style={{ color: "var(--muted)", fontSize: 12, marginTop: 10 }}>Projektordner: {dir}</p>
-        )}
-      </div>
+          <p className="recent-foot">
+            {anyOld || veraltet.size > 0 ? (
+              <>
+                <sup className="dagger">†</sup> Stil veraltet,{" "}
+                <button className="link" onClick={() => setStilOpen(true)}>
+                  {veraltet.size === 1 ? "Projekt aktualisieren" : `${veraltet.size} Projekte aktualisieren`}
+                </button>
+              </>
+            ) : (
+              <span className="path">{dir}</span>
+            )}
+          </p>
+        </section>
+      </main>
       {stilOpen && (
         <StilAlleDialog
           projects={stil}
@@ -438,9 +479,6 @@ export function Hub({ onOpen }: { onOpen(path: string): void }) {
             api.stilScanAll().then(setStil, () => {});
           }}
         />
-      )}
-      {dialog && (
-        <NewProjectDialog templates={templates} initial={dialog} onClose={() => setDialog(null)} onCreated={(path) => onOpen(path)} />
       )}
     </div>
   );

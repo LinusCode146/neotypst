@@ -71,7 +71,44 @@ pub fn create_project(name: &str, template: &str, fields: &[(String, String)]) -
         let _ = fs::remove_dir_all(&dir);
         return Err(e);
     }
+    // Das Stilprofil ist kein Platzhalter der Vorlage: es wird nachträglich in
+    // den Aufruf in main.typ geschrieben, damit auch ältere Vorlagen es können.
+    if let Some((_, profil)) = fields.iter().find(|(k, _)| k == "profil") {
+        let main = dir.join("main.typ");
+        if let Ok(text) = fs::read_to_string(&main) {
+            let neu = profil_setzen(&text, profil);
+            if neu != text {
+                fs::write(&main, neu).map_err(|e| e.to_string())?;
+            }
+        }
+    }
     Ok(dir.to_string_lossy().into_owned())
+}
+
+/// Trägt `profil: "…"` in den ersten `#show: ….with(`-Aufruf ein, bei
+/// `#show: stil` wird daraus `stil.with(profil: …)`. „klassisch“ ist der
+/// Standard und ändert nichts, ebenso ein schon gesetztes Profil.
+pub fn profil_setzen(text: &str, profil: &str) -> String {
+    if !matches!(profil, "akademisch" | "schlicht") || text.contains("profil:") {
+        return text.to_string();
+    }
+    let mut out = String::with_capacity(text.len() + 32);
+    let mut erledigt = false;
+    for line in text.split_inclusive('\n') {
+        let t = line.trim_end();
+        if !erledigt && t.starts_with("#show:") && t.ends_with(".with(") {
+            out.push_str(line);
+            out.push_str(&format!("  profil: \"{profil}\",\n"));
+            erledigt = true;
+        } else if !erledigt && t == "#show: stil" {
+            out.push_str(&format!("#show: stil.with(profil: \"{profil}\")"));
+            out.push_str(&line[t.len()..]);
+            erledigt = true;
+        } else {
+            out.push_str(line);
+        }
+    }
+    out
 }
 
 #[derive(Serialize)]
@@ -425,6 +462,17 @@ pub fn save_asset(root: &Path, name: &str, bytes: &[u8]) -> Result<String, Strin
 #[cfg(test)]
 mod file_ops_tests {
     use super::*;
+
+    #[test]
+    fn profil_wird_eingetragen() {
+        let blatt = "#import \"templates/arbeitsblatt.typ\": *\n\n#show: arbeitsblatt.with(\n  titel: \"A\",\n)\n";
+        let neu = profil_setzen(blatt, "akademisch");
+        assert!(neu.contains("#show: arbeitsblatt.with(\n  profil: \"akademisch\",\n  titel: \"A\","));
+        assert_eq!(profil_setzen(blatt, "klassisch"), blatt);
+        assert_eq!(profil_setzen(&neu, "schlicht"), neu);
+        let leer = "#import \"templates/stil.typ\": *\n#show: stil\n\n= T\n";
+        assert_eq!(profil_setzen(leer, "schlicht"), "#import \"templates/stil.typ\": *\n#show: stil.with(profil: \"schlicht\")\n\n= T\n");
+    }
 
     #[test]
     fn pasted_assets_get_free_names() {

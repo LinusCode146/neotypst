@@ -18,3 +18,25 @@ describe("outlineOf", () => {
     expect(outlineOf(text)).toEqual([{ level: 1, title: "Titel", line: 5 }]);
   });
 });
+
+describe("outlineOf mit Aufgaben", () => {
+  it("zählt Aufgaben wie stil.typ und liest Punkte und Titel", () => {
+    const text = [
+      "#aufgabe(punkte: 2)[",
+      "  Text",
+      "]",
+      '#aufgabe(punkte: 4, titel: "Bremsweg")[',
+      '#aufgabe(nr: "3.12")[x]',
+      "#aufgabe(nr: none)[x]",
+      "// #aufgabe(punkte: 9)[]",
+      "#aufgabe[ohne Argumente]",
+    ].join("\n");
+    expect(outlineOf(text)).toEqual([
+      { level: 2, title: "Aufgabe 1", line: 1, aufgabe: true, punkte: 2 },
+      { level: 2, title: "Aufgabe 2 Bremsweg", line: 4, aufgabe: true, punkte: 4 },
+      { level: 2, title: "Aufgabe 3.12", line: 5, aufgabe: true },
+      { level: 2, title: "Aufgabe", line: 6, aufgabe: true },
+      { level: 2, title: "Aufgabe 3", line: 8, aufgabe: true },
+    ]);
+  });
+});

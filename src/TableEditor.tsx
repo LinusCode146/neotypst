@@ -345,7 +345,7 @@ export function TableEditor({ initial, isNew, onApply, onClose }: Props) {
             Abbrechen
           </button>
           <button className="btn primary" onClick={() => onApply(g)}>
-            {isNew ? "Einfügen" : "Übernehmen"} <kbd style={{ background: "transparent", color: "inherit", borderColor: "rgba(255,255,255,.35)" }}>{kbd("⌘↩")}</kbd>
+            {isNew ? "Einfügen" : "Übernehmen"} <kbd className="on-primary">{kbd("⌘↩")}</kbd>
           </button>
         </div>
       </div>
