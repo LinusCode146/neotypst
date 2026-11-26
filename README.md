@@ -260,7 +260,7 @@ In eigenen Dokumenten:
 
 Unten in der Statusleiste steht „Schrift: …“. Ein Klick darauf wählt die Standardschrift für Vorschau und PDF. Dasselbe geht über die Befehlspalette mit „Dokumentschrift“. Zur Wahl stehen Computer Modern (LaTeX, Standard), Libertinus Serif (Typst-Standard), Libron, Palatino, Charter, Georgia, Times New Roman und Helvetica. Fehlt eine Schrift auf dem Rechner, steht im Menü „nicht installiert“, und es gilt Computer Modern.
 
-Die Wahl gilt für alle Dokumente mit `stil.typ` oder einer der Vorlagen. Ein Dokument mit eigener Angabe wie `#show: stil.with(schrift: "Libron")` behält seine Schrift. Außerhalb von NeoTypst kompiliert ein Dokument ohne eigene Angabe in Computer Modern.
+Die Wahl gilt nur für das offene Projekt, jedes Projekt merkt sich seine eigene Schrift. Beim Anlegen auf der Startseite wird sie unter „Satz“ gewählt. Sie wirkt auf alle Dokumente des Projekts mit `stil.typ` oder einer der Vorlagen. Ein Dokument mit eigener Angabe wie `#show: stil.with(schrift: "Libron")` behält seine Schrift. Außerhalb von NeoTypst kompiliert ein Dokument ohne eigene Angabe in Computer Modern.
 
 ## Betrachter für PDFs und Bilder
 
