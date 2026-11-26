@@ -821,7 +821,10 @@ mod tests {
         let elapsed = t.elapsed();
         assert!(p.result.issues.is_empty(), "{:?}", p.result.issues.first());
         eprintln!("10 Seiten: {elapsed:?}");
-        assert!(elapsed < std::time::Duration::from_millis(500), "{elapsed:?}");
+        // Lokal sind 500 ms das Ziel. Die geteilten CI-Rechner schwanken stark,
+        // dort fängt die Grenze nur grobe Rückschritte ab, keine Zufälle.
+        let grenze = if std::env::var_os("CI").is_some() { 2000 } else { 500 };
+        assert!(elapsed < std::time::Duration::from_millis(grenze), "{elapsed:?}");
     }
 
     #[cfg(target_os = "macos")]
