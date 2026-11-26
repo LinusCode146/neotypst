@@ -99,8 +99,8 @@ const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
     return paths;
   },
   stil_scan_all: () => [
-    { name: "Physik Blatt 3 – Kinematik", path: "/mock/a", veraltet: ["templates/stil.typ", "templates/arbeitsblatt.typ"], angepasst: [] },
-    { name: "Doku Sortieralgorithmen", path: "/mock/b", veraltet: ["templates/stil.typ"], angepasst: ["templates/dokumentation.typ"] },
+    { name: "Physik Blatt 3 – Kinematik", path: "/p/1", veraltet: ["templates/stil.typ", "templates/arbeitsblatt.typ"], angepasst: [] },
+    { name: "Doku Sortieralgorithmen", path: "/p/3", veraltet: ["templates/stil.typ"], angepasst: ["templates/dokumentation.typ"] },
   ],
   stil_update_project: ({ paths }) => paths,
   history_snapshot: ({ text, reason }) => {
