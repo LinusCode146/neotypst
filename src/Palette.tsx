@@ -78,11 +78,18 @@ export function Palette({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "ArrowDown" || (e.ctrlKey && e.key === "n")) {
+            // Wie in den Vorschlägen beim Schreiben: Strg+J/K (und Strg+N/P)
+            // wandern durch die Liste. Unter Windows ist Strg+K sonst das
+            // Kürzel für die Palette selbst, darum nicht weiterreichen.
+            const ctrl = e.ctrlKey && !e.metaKey && !e.altKey;
+            const key = e.key.toLowerCase();
+            if (e.key === "ArrowDown" || (ctrl && (key === "n" || key === "j"))) {
               e.preventDefault();
+              e.stopPropagation();
               setSel((s) => Math.min(s + 1, results.length - 1));
-            } else if (e.key === "ArrowUp" || (e.ctrlKey && e.key === "p")) {
+            } else if (e.key === "ArrowUp" || (ctrl && (key === "p" || key === "k"))) {
               e.preventDefault();
+              e.stopPropagation();
               setSel((s) => Math.max(s - 1, 0));
             } else if (e.key === "Enter") {
               e.preventDefault();
