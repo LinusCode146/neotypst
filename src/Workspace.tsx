@@ -9,7 +9,7 @@ import { StilDialog } from "./StilDialog";
 import { HistoryDialog, zeitText } from "./HistoryDialog";
 import { LiteratureDialog } from "./LiteratureDialog";
 import { Editor, type EditorHandle } from "./editor/Editor";
-import { matrixSnippet, tableSnippet } from "./editor/snippets";
+import { matrixSnippet, SNIPPETS, tableSnippet } from "./editor/snippets";
 import { Icon } from "./icons";
 import { Palette, type PaletteItem } from "./Palette";
 import { handleKey, keyLabel, paletteItems, withKeys, type Command } from "./workspace/commands";
@@ -21,6 +21,8 @@ import { useFileActions } from "./workspace/useFileActions";
 import type { Menu, Toast } from "./workspace/types";
 import { createStore } from "./workspace/store";
 import { Titlebar } from "./workspace/Titlebar";
+import { InsertBar, type InsertAction } from "./workspace/InsertBar";
+import { PreviewBar } from "./workspace/PreviewBar";
 import { StatusBar } from "./workspace/StatusBar";
 import { Outline } from "./workspace/Outline";
 import { EditorNotices } from "./workspace/EditorNotices";
@@ -631,6 +633,22 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
     return isMat ? items.reverse() : items;
   }, []);
 
+  const insertBaustein = (label: string) => {
+    const body = SNIPPETS.find((x) => x.label === label)?.body;
+    if (body) editor.current?.insertSnippet(body);
+    editor.current?.focus();
+  };
+  const insertActions: InsertAction[] = [
+    { id: "aufgabe", label: "Aufgabe", title: "Aufgabe mit Punkten und Lösung", run: () => insertBaustein("aufgabel") },
+    { id: "merke", label: "Merke", title: "Merkkasten", run: () => insertBaustein("merke") },
+    { id: "platz", label: "Platz", title: "Rechenplatz", run: () => insertBaustein("platz") },
+    { id: "tabelle", label: "Tabelle", title: title("grid-editor", "Tabellen-Editor"), sep: true, run: () => void openTableEditor() },
+    { id: "matrix", label: "Matrix", title: "Matrix-Editor", run: () => void openMatrixEditor() },
+    { id: "symbol", label: "Symbol", title: title("symbols", "Symbole"), run: () => setSymbolsOpen(true) },
+    { id: "grafik", label: "Grafik", title: title("graphics", "Grafik einfügen"), run: () => setGraphicsOpen(true) },
+    { id: "quelle", label: "Quelle", title: title("literature", "Literatur & Zitate"), run: () => setLitOpen(true) },
+  ];
+
   // ---------- Render ----------
 
   const firstError = diags.find((d) => d.severity === "error");
@@ -644,29 +662,10 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
         current={current}
         dirty={dirty}
         sidebar={settings.sidebar}
-        zoom={shownZoom}
         title={title}
         onHome={onClose}
         onToggleSidebar={() => setSettings({ sidebar: !settings.sidebar })}
-        onLiterature={() => setLitOpen(true)}
-        onGraphics={() => setGraphicsOpen(true)}
-        onSymbols={() => setSymbolsOpen(true)}
-        onGrid={() => void openGridEditor()}
         onPalette={() => setPalette("all")}
-        onZoom={zoom}
-        onExportMenu={(r) =>
-          setMenu({
-            x: r.right - 240,
-            y: r.bottom + 6,
-            items: [
-              { label: "PDF exportieren", detail: keyLabel("mod+e"), run: () => exportPdf(false) },
-              { label: "Aufgaben + Lösungen exportieren", detail: keyLabel("mod+shift+e"), run: () => exportPdf(true) },
-              { label: "Speichern unter …", run: () => void exportPdfAs() },
-              "sep",
-              { label: "Ordner „out“ im Finder", run: () => revealItemInDir(project.root + "/out") },
-            ],
-          })
-        }
       />
 
       <div className="panes" ref={panes}>
@@ -710,6 +709,7 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
         )}
 
         <section className="editor-pane" style={{ flexBasis: `${split * 100}%`, display: viewing ? "none" : undefined }}>
+          <InsertBar actions={insertActions} />
           <EditorNotices
             stil={stil}
             diags={diags}
@@ -760,7 +760,27 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
 
         <div className={"splitter" + (dragging ? " dragging" : "")} onMouseDown={startDrag} hidden={!!viewing} />
 
-        <div style={{ flexBasis: `${(1 - split) * 100}%`, display: viewing ? "none" : "flex", minWidth: 260, flexGrow: 1, flexShrink: 1 }}>
+        <div className="preview-col" style={{ flexBasis: `${(1 - split) * 100}%`, display: viewing ? "none" : "flex" }}>
+          <PreviewBar
+            pageCount={pages.length}
+            zoom={shownZoom}
+            title={title}
+            onZoom={zoom}
+            onExport={() => void exportPdf(false)}
+            onExportMenu={(r) =>
+              setMenu({
+                x: r.right - 260,
+                y: r.bottom + 6,
+                items: [
+                  { label: "PDF exportieren", detail: keyLabel("mod+e"), run: () => exportPdf(false) },
+                  { label: "Aufgaben + Lösungen exportieren", detail: keyLabel("mod+shift+e"), run: () => exportPdf(true) },
+                  { label: "Speichern unter …", run: () => void exportPdfAs() },
+                  "sep",
+                  { label: "Ordner „out“ im Finder", run: () => revealItemInDir(project.root + "/out") },
+                ],
+              })
+            }
+          />
           <Preview
             ref={preview}
             pages={pages}
@@ -778,7 +798,6 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
         diags={diags}
         compiling={compiling}
         millis={millis}
-        pageCount={pages.length}
         spell={settings.spell}
         spellInfo={spellInfo}
         vimMode={vimMode}

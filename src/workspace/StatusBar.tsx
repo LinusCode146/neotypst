@@ -2,12 +2,11 @@ import type { Diag } from "../api";
 import { keyLabel } from "./commands";
 import { useStore, type Store } from "./store";
 
-/** Untere Leiste: Fehler, Kompilierzeit, Seiten, Rechtschreibung, vim, Cursor, Speicherstand. */
+/** Untere Leiste: Fehler, Kompilierzeit, Rechtschreibung, vim, Cursor, Speicherstand. */
 export function StatusBar(p: {
   diags: Diag[];
   compiling: boolean;
   millis: number | null;
-  pageCount: number;
   spell: string;
   spellInfo: { count: number; dominant: string | null };
   vimMode: string | null;
@@ -33,9 +32,6 @@ export function StatusBar(p: {
         )}
       </button>
       <span className="item">{p.compiling ? "kompiliert …" : p.millis != null ? `${p.millis} ms` : ""}</span>
-      <span className="item">
-        {p.pageCount} Seite{p.pageCount === 1 ? "" : "n"}
-      </span>
       <span className="grow" />
       <button
         className="item"
