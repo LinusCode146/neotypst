@@ -9,7 +9,7 @@ import { StilDialog } from "./StilDialog";
 import { HistoryDialog, zeitText } from "./HistoryDialog";
 import { LiteratureDialog } from "./LiteratureDialog";
 import { Editor, type EditorHandle } from "./editor/Editor";
-import { matrixSnippet, SNIPPETS, tableSnippet } from "./editor/snippets";
+import { matrixSnippet, tableSnippet } from "./editor/snippets";
 import { Icon } from "./icons";
 import { Palette, type PaletteItem } from "./Palette";
 import { handleKey, keyLabel, paletteItems, withKeys, type Command } from "./workspace/commands";
@@ -643,15 +643,42 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
     return isMat ? items.reverse() : items;
   }, []);
 
-  const insertBaustein = (label: string) => {
-    const body = SNIPPETS.find((x) => x.label === label)?.body;
-    if (body) editor.current?.insertSnippet(body);
+  /** Fügt einen Baustein aus stil.typ ein und gibt dem Editor den Fokus zurück. */
+  const einfuegen = (body: string) => {
+    editor.current?.insertSnippet(body);
     editor.current?.focus();
   };
+  /** `erg(…)` gehört in eine Formel; außerhalb kommt die Formel mit. */
+  const ergebnisEinfuegen = async () => {
+    const ed = editor.current;
+    if (!ed) return;
+    const mode = await api.modeAt(ed.getText(), ed.cursor()).catch(() => "markup" as const);
+    einfuegen(mode === "math" ? "erg(${1})" : "$${1} = erg(${2})$");
+  };
+  const aufgabe = (args: string) =>
+    `#aufgabe${args ? `(${args})` : ""}[\n  \${${args ? 2 : 1}:Aufgabenstellung}\n]\n\n\${${args ? 3 : 2}}`;
   const insertActions: InsertAction[] = [
-    { id: "aufgabe", label: "Aufgabe", title: "Aufgabe mit Punkten und Lösung", run: () => insertBaustein("aufgabel") },
-    { id: "merke", label: "Merke", title: "Merkkasten", run: () => insertBaustein("merke") },
-    { id: "platz", label: "Platz", title: "Rechenplatz", run: () => insertBaustein("platz") },
+    {
+      id: "aufgabe",
+      label: "Aufgabe",
+      title: "Aufgabe, die Lösung folgt darunter",
+      run: () => einfuegen(aufgabe("")),
+      more: (r) =>
+        setMenu({
+          x: r.left,
+          y: r.bottom + 6,
+          items: [
+            { label: "Aufgabe", detail: "#aufgabe[…]", run: () => einfuegen(aufgabe("")) },
+            { label: "mit Titel", detail: "titel:", run: () => einfuegen(aufgabe('titel: "${1:Thema}"')) },
+            { label: "mit Punkten", detail: "punkte:", run: () => einfuegen(aufgabe("punkte: ${1:2}")) },
+            { label: "mit eigener Nummer", detail: "nr:", run: () => einfuegen(aufgabe('nr: "${1:3.12}"')) },
+            { label: "ohne Nummer", detail: "nr: none", run: () => einfuegen("#aufgabe(nr: none)[\n  ${1:Aufgabenstellung}\n]\n\n${2}") },
+          ],
+        }),
+    },
+    { id: "teil", label: "Teil", title: "Teilaufgabe a), b), c) in der Lösung", run: () => einfuegen("#teil[\n  ${1}\n]\n${2}") },
+    { id: "ergebnis", label: "Ergebnis", title: "Ergebnis doppelt unterstrichen: erg(…)", run: () => void ergebnisEinfuegen() },
+    { id: "antwort", label: "Antwort", title: "Antwortsatz unter einer Rechnung", run: () => einfuegen("#antwort[${1}]") },
     { id: "tabelle", label: "Tabelle", title: title("grid-editor", "Tabellen-Editor"), sep: true, run: () => void openTableEditor() },
     { id: "matrix", label: "Matrix", title: "Matrix-Editor", run: () => void openMatrixEditor() },
     { id: "symbol", label: "Symbol", title: title("symbols", "Symbole"), run: () => setSymbolsOpen(true) },

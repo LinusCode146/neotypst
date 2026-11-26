@@ -78,14 +78,14 @@ export const SNIPPETS: SnippetDef[] = [
   {
     label: "aufgabe",
     group: "Arbeitsblatt",
-    detail: "Aufgabe mit Nummer, die Lösung folgt darunter",
-    body: '#aufgabe(nr: "${1:1}")[\n  ${2:Aufgabenstellung}\n]\n\n${3}',
+    detail: "Aufgabe, zählt selbst mit; die Lösung folgt darunter",
+    body: "#aufgabe[\n  ${1:Aufgabenstellung}\n]\n\n${2}",
   },
   {
     label: "aufgabet",
     group: "Arbeitsblatt",
-    detail: "Aufgabe mit Nummer und Thema",
-    body: '#aufgabe(nr: "${1:1}", titel: "${2:Thema}")[\n  ${3:Aufgabenstellung}\n]\n\n${4}',
+    detail: "Aufgabe mit Thema",
+    body: '#aufgabe(titel: "${1:Thema}")[\n  ${2:Aufgabenstellung}\n]\n\n${3}',
   },
   {
     label: "aufgabel",

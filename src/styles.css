@@ -3149,3 +3149,23 @@ kbd.on-primary {
   width: 13px;
   height: 13px;
 }
+.insert-solo,
+.insert-group {
+  display: contents;
+}
+.insert-group .insert-btn:first-of-type {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  padding-right: 6px;
+}
+.insert-more {
+  padding: 0 5px;
+  margin-left: -2px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  color: var(--muted);
+}
+.insert-more svg {
+  width: 12px;
+  height: 12px;
+}
