@@ -5,8 +5,8 @@ import { api, type ProjektStil, type ProjectInfo, type Template } from "./api";
 import { StilAlleDialog } from "./StilDialog";
 import { Icon } from "./icons";
 import { kbd, modKey } from "./platform";
-import { setSettings, useSettings } from "./settings";
-import { SCHRIFTEN, schriftAnwenden } from "./schriften";
+import { setProjektSchrift, useSettings } from "./settings";
+import { SCHRIFTEN } from "./schriften";
 
 /** Schematic page previews for the template cards. */
 export function TemplateThumb({ id }: { id: string }) {
@@ -121,6 +121,7 @@ export function TemplatePreview({ id }: { id: string }) {
 }
 
 const MEMORY = "neotypst.fieldMemory";
+const SCHRIFT_MEMORY = "_schrift";
 function loadMemory(): Record<string, string> {
   try {
     return JSON.parse(localStorage.getItem(MEMORY) || "{}");
@@ -154,6 +155,8 @@ const PROFILE = ["klassisch", "akademisch", "schlicht"] as const;
 /** „Neues Blatt“: Vorlage wählen, Kopf ausfüllen, Satz einstellen, anlegen. */
 function NewSheet({ templates, onCreated, focusKey }: { templates: Template[]; onCreated(path: string): void; focusKey: number }) {
   const settings = useSettings();
+  // Die Schrift gilt nur für das neue Projekt; die letzte Wahl wird vorgeschlagen.
+  const [schrift, setSchrift] = useState(() => loadMemory()[SCHRIFT_MEMORY] ?? settings.schrift);
   const [tplId, setTplId] = useState("arbeitsblatt");
   const tpl = templates.find((t) => t.id === tplId) ?? templates[0];
   const [values, setValues] = useState<Record<string, string>>(() => initialValues(tpl));
@@ -205,7 +208,9 @@ function NewSheet({ templates, onCreated, focusKey }: { templates: Template[]; o
       const path = await api.createProject(folderName.trim(), tpl.id, fields);
       const mem = loadMemory();
       for (const f of tpl.fields) if (f.remember && values[f.key]?.trim()) mem[f.key] = values[f.key].trim();
+      mem[SCHRIFT_MEMORY] = schrift;
       localStorage.setItem(MEMORY, JSON.stringify(mem));
+      setProjektSchrift(path, schrift);
       onCreated(path);
     } catch (e) {
       setError(String(e));
@@ -308,20 +313,14 @@ function NewSheet({ templates, onCreated, focusKey }: { templates: Template[]; o
         )}
         <label className="sheet-choice">
           <span className="lbl">Schrift</span>
-          <select
-            value={settings.schrift}
-            onChange={(e) => {
-              setSettings({ schrift: e.target.value });
-              schriftAnwenden(e.target.value).catch(() => {});
-            }}
-          >
+          <select value={schrift} onChange={(e) => setSchrift(e.target.value)}>
             {SCHRIFTEN.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.label}
               </option>
             ))}
           </select>
-          <span className="hint">gilt für alle Projekte</span>
+          <span className="hint">nur für dieses Projekt</span>
         </label>
       </div>
 

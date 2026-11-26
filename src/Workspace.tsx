@@ -29,7 +29,7 @@ import { EditorNotices } from "./workspace/EditorNotices";
 import { SaveTemplateDialog } from "./workspace/SaveTemplateDialog";
 import { PopupMenu, ToastView } from "./workspace/Overlays";
 import { Preview, type Marker, type PreviewHandle } from "./Preview";
-import { getSettings, setSettings, useSettings } from "./settings";
+import { getSettings, schriftVon, setProjektSchrift, setSettings, useSettings } from "./settings";
 
 import { TableEditor } from "./TableEditor";
 import { FileTree, fileIcon } from "./FileTree";
@@ -139,15 +139,18 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
 
   const { pages, diags, diagsRef, millis, compiling, requestCompile, latest, svgCache } = useCompile({ editor, showToast });
 
-  // Andere Dokumentschrift: neu kompilieren (die erste setzt main.tsx).
-  const schriftGesetzt = useRef(settings.schrift);
+  // Dokumentschrift gilt je Projekt. Beim Öffnen setzt sie der erste Ladevorgang
+  // (unten), danach wird bei jeder Änderung neu kompiliert.
+  const schrift = schriftVon(settings, project.root);
+  const setSchrift = useCallback((id: string) => setProjektSchrift(project.root, id), [project.root]);
+  const schriftGesetzt = useRef(schrift);
   useEffect(() => {
-    if (schriftGesetzt.current === settings.schrift) return;
-    schriftGesetzt.current = settings.schrift;
-    schriftAnwenden(settings.schrift)
+    if (schriftGesetzt.current === schrift) return;
+    schriftGesetzt.current = schrift;
+    schriftAnwenden(schrift)
       .then(requestCompile)
       .catch((e) => showToast({ text: String(e), kind: "error" }));
-  }, [settings.schrift, requestCompile, showToast]);
+  }, [schrift, requestCompile, showToast]);
 
   // Welche Schriften auf diesem Rechner vorhanden sind, für das Menü.
   const [schriftDa, setSchriftDa] = useState<Record<string, boolean>>({});
@@ -162,9 +165,9 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
       .catch(() => {});
   }, []);
   const schriftItems = SCHRIFTEN.map((s) => ({
-    label: (settings.schrift === s.id ? "✓ " : "   ") + s.label,
+    label: (schrift === s.id ? "✓ " : "   ") + s.label,
     detail: schriftDa[s.id] === false ? "nicht installiert" : s.detail || undefined,
-    run: () => setSettings({ schrift: s.id }),
+    run: () => setSchrift(s.id),
   }));
 
   // ---------- Files ----------
@@ -315,7 +318,12 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
   // Initial load.
   useEffect(() => {
     svgCache.current.clear();
-    openFile(project.main).then(() => requestCompile());
+    // Erst die Schrift dieses Projekts, dann laden und kompilieren: die Engine
+    // arbeitet Aufträge der Reihe nach ab.
+    schriftAnwenden(schriftGesetzt.current)
+      .catch(() => {})
+      .then(() => openFile(project.main))
+      .then(() => requestCompile());
     void refreshStil();
     return () => {
       flushSave();
@@ -563,6 +571,8 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
   const commands = buildCommands(
     {
       settings,
+      schrift,
+      setSchrift,
       project,
       main,
       togglePalette: (kind) => setPalette((p) => (p ? null : kind)),
@@ -804,7 +814,7 @@ export function Workspace({ project, onClose }: { project: OpenedProject; onClos
         cursor={cursorStore}
         dirty={dirty}
         onToggleProblems={() => setShowProblems((s) => !s)}
-        schrift={schriftById(settings.schrift).label}
+        schrift={schriftById(schrift).label}
         onSchriftMenu={(r) => setMenu({ x: r.left, y: r.top - 8 - SCHRIFTEN.length * 28 - 10, items: schriftItems })}
         onSpellMenu={(r) =>
           setMenu({

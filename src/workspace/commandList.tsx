@@ -16,6 +16,9 @@ export const spellLabel = (m: string) => ({ auto: "Automatisch", de: "Deutsch", 
 
 export type CommandContext = {
   settings: Settings;
+  /** Dokumentschrift dieses Projekts und wie sie geändert wird. */
+  schrift: string;
+  setSchrift(id: string): void;
   project: { name: string; root: string };
   main: string;
   togglePalette(kind: "all" | "files"): void;
@@ -222,12 +225,12 @@ export function buildCommands(ctx: CommandContext, files: Command[]): Command[] 
   const prefs: Command[] = [
     ...SCHRIFTEN.map((s) => ({
       id: "schrift-" + s.id,
-      label: `Dokumentschrift: ${s.label}${settings.schrift === s.id ? " ✓" : ""}`,
+      label: `Dokumentschrift: ${s.label}${ctx.schrift === s.id ? " ✓" : ""}`,
       detail: s.detail || undefined,
       keywords: "schrift schriftart font dokument pdf " + s.familien.join(" "),
       group: "Einstellungen",
       icon: <Icon.settings />,
-      run: () => setSettings({ schrift: s.id }),
+      run: () => ctx.setSchrift(s.id),
     })),
     ...SPELL_MODES.map((m) => ({
       id: "spell-" + m,

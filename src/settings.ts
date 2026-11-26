@@ -10,7 +10,8 @@ export type Settings = {
   zoom: number; // preview zoom, 1 = fit width
   spell: "auto" | "de" | "en" | "off";
   mathQuote: boolean; // auto-quote unknown words in formulas
-  schrift: string; // Dokumentschrift, id aus schriften.ts
+  schrift: string; // Dokumentschrift für Projekte ohne eigene Wahl (id aus schriften.ts)
+  projektSchrift: Record<string, string>; // Dokumentschrift je Projektordner
 };
 
 const DEFAULTS: Settings = {
@@ -24,6 +25,7 @@ const DEFAULTS: Settings = {
   spell: "auto",
   mathQuote: true,
   schrift: "latex",
+  projektSchrift: {},
 };
 
 const KEY = "neotypst.settings";
@@ -69,4 +71,18 @@ export function applyTheme() {
   const root = document.documentElement;
   if (current.theme === "system") root.removeAttribute("data-theme");
   else root.setAttribute("data-theme", current.theme);
+}
+
+/** Pfad als Schlüssel: gleich, ob mit Präfix `\\?\` (Windows), Backslashes oder Schrägstrich am Ende. */
+export function projektKey(root: string): string {
+  return root.replace(/^\\\\\?\\/, "").replace(/\\/g, "/").replace(/\/+$/, "");
+}
+
+/** Dokumentschrift eines Projekts; ohne eigene Wahl die bisherige Standardschrift. */
+export function schriftVon(s: Settings, root: string): string {
+  return s.projektSchrift[projektKey(root)] ?? s.schrift;
+}
+
+export function setProjektSchrift(root: string, id: string) {
+  setSettings({ projektSchrift: { ...current.projektSchrift, [projektKey(root)]: id } });
 }
