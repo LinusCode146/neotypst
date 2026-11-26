@@ -3,6 +3,10 @@ import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import { applyTheme, getSettings } from "./settings";
 import { schriftAnwenden } from "./schriften";
+import "@fontsource-variable/geist";
+import "@fontsource-variable/geist-mono";
+import "@fontsource-variable/stix-two-text";
+import "@fontsource-variable/stix-two-text/wght-italic.css";
 import "./styles.css";
 import { isMac } from "./platform";
 
