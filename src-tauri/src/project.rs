@@ -53,7 +53,8 @@ pub fn list_projects() -> Result<Vec<ProjectInfo>, String> {
     Ok(out)
 }
 
-pub fn create_project(name: &str, template: &str, fields: &[(String, String)]) -> Result<String, String> {
+/// Ordnername aus einem eingegebenen Projektnamen; Pfadzeichen werden zu `-`.
+fn clean_name(name: &str) -> Result<String, String> {
     let clean: String = name
         .trim()
         .chars()
@@ -62,6 +63,53 @@ pub fn create_project(name: &str, template: &str, fields: &[(String, String)]) -
     if clean.is_empty() || clean.starts_with('.') || clean == templates::USER_DIR {
         return Err("Ungültiger Projektname".into());
     }
+    Ok(clean)
+}
+
+/// Ein Projektordner direkt im Projektverzeichnis `base`, sonst ein Fehler.
+/// Schützt Umbenennen und Löschen vor Pfaden außerhalb der Projekte.
+fn project_in(base: &Path, path: &str) -> Result<PathBuf, String> {
+    let dir = PathBuf::from(path).canonicalize().map_err(|_| "Projekt nicht gefunden".to_string())?;
+    let base = base.canonicalize().map_err(|e| e.to_string())?;
+    let ok = dir.is_dir()
+        && dir.parent() == Some(base.as_path())
+        && !is_hidden(&dir)
+        && dir.file_name().is_some_and(|n| n != templates::USER_DIR);
+    if ok {
+        Ok(dir)
+    } else {
+        Err("Kein Projekt im Typst-Ordner".into())
+    }
+}
+
+fn rename_project_in(base: &Path, path: &str, name: &str) -> Result<String, String> {
+    let dir = project_in(base, path)?;
+    let clean = clean_name(name)?;
+    let target = dir.with_file_name(&clean);
+    if target == dir {
+        return Ok(dir.to_string_lossy().into_owned());
+    }
+    // Nur Groß-/Kleinschreibung geändert: auf macOS und Windows derselbe Ordner.
+    let same = target.exists() && fs::canonicalize(&target).ok() == Some(dir.clone());
+    if target.exists() && !same {
+        return Err(format!("Ein Projekt namens „{clean}“ existiert bereits"));
+    }
+    fs::rename(&dir, &target).map_err(|e| e.to_string())?;
+    Ok(target.to_string_lossy().into_owned())
+}
+
+/// Benennt einen Projektordner um; gibt den neuen Pfad zurück.
+pub fn rename_project(path: &str, name: &str) -> Result<String, String> {
+    rename_project_in(&projects_dir()?, path, name)
+}
+
+/// Legt einen ganzen Projektordner in den Papierkorb.
+pub fn trash_project(path: &str) -> Result<String, String> {
+    trash_path(&project_in(&projects_dir()?, path)?)
+}
+
+pub fn create_project(name: &str, template: &str, fields: &[(String, String)]) -> Result<String, String> {
+    let clean = clean_name(name)?;
     let dir = projects_dir()?.join(&clean);
     if dir.exists() {
         return Err(format!("Ein Projekt namens „{clean}“ existiert bereits"));
@@ -462,6 +510,28 @@ pub fn save_asset(root: &Path, name: &str, bytes: &[u8]) -> Result<String, Strin
 #[cfg(test)]
 mod file_ops_tests {
     use super::*;
+
+    #[test]
+    fn projekte_umbenennen_nur_im_typst_ordner() {
+        let base = std::env::temp_dir().join("neotypst-rename-test");
+        let _ = fs::remove_dir_all(&base);
+        fs::create_dir_all(base.join("Blatt A")).unwrap();
+        fs::create_dir_all(base.join("Blatt B")).unwrap();
+        fs::create_dir_all(base.join("Blatt A/unter")).unwrap();
+        let a = base.join("Blatt A").to_string_lossy().into_owned();
+
+        let neu = rename_project_in(&base, &a, "Kinematik: Teil 1").unwrap();
+        assert!(neu.ends_with("Kinematik- Teil 1"));
+        assert!(base.join("Kinematik- Teil 1/unter").is_dir());
+        // Schon vergeben, ungültig, oder kein Projekt direkt im Ordner.
+        assert!(rename_project_in(&base, &neu, "Blatt B").is_err());
+        assert!(rename_project_in(&base, &neu, "  ").is_err());
+        assert!(rename_project_in(&base, &neu, ".versteckt").is_err());
+        let unter = base.join("Kinematik- Teil 1/unter").to_string_lossy().into_owned();
+        assert!(rename_project_in(&base, &unter, "x").is_err());
+        assert!(project_in(&base, &std::env::temp_dir().to_string_lossy()).is_err());
+        let _ = fs::remove_dir_all(&base);
+    }
 
     #[test]
     fn profil_wird_eingetragen() {

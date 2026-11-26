@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { api, type ProjektStil, type ProjectInfo, type Template } from "./api";
 import { StilAlleDialog } from "./StilDialog";
 import { Icon } from "./icons";
-import { kbd, modKey } from "./platform";
-import { setProjektSchrift, useSettings } from "./settings";
+import { isMac, kbd, modKey } from "./platform";
+import { PopupMenu } from "./workspace/Overlays";
+import type { Menu } from "./workspace/types";
+import { projektVerschoben, setProjektSchrift, useSettings } from "./settings";
 import { SCHRIFTEN } from "./schriften";
 
 /** Schematic page previews for the template cards. */
@@ -360,12 +362,57 @@ export function Hub({ onOpen }: { onOpen(path: string): void }) {
   const search = useRef<HTMLInputElement>(null);
   const veraltet = useMemo(() => new Set(stil.filter((p) => p.veraltet.length > 0).map((p) => p.path)), [stil]);
 
-  useEffect(() => {
-    api.listProjects().then(setProjects).catch((e) => setError(String(e)));
+  const [menu, setMenu] = useState<Menu | null>(null);
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [loeschen, setLoeschen] = useState<ProjectInfo | null>(null);
+  const [laedt, setLaedt] = useState(false);
+
+  /** Projektliste und Stilstand neu einlesen, etwa nach Änderungen im Finder. */
+  const reload = useCallback(async () => {
+    setLaedt(true);
+    try {
+      setProjects(await api.listProjects());
+      setError(null);
+    } catch (e) {
+      setError(String(e));
+    }
     api.stilScanAll().then(setStil, () => setStil([]));
+    setLaedt(false);
+  }, []);
+
+  useEffect(() => {
+    void reload();
     api.listTemplates().then(setTemplates);
     api.projectsDir().then(setDir);
-  }, []);
+  }, [reload]);
+
+  // Enter und das anschließende Blur dürfen nur einmal umbenennen.
+  const renameLaeuft = useRef(false);
+  const umbenennen = async (p: ProjectInfo, name: string) => {
+    if (renameLaeuft.current) return;
+    setRenaming(null);
+    if (!name.trim() || name.trim() === p.name) return;
+    renameLaeuft.current = true;
+    try {
+      const neu = await api.renameProject(p.path, name);
+      projektVerschoben(p.path, neu);
+      await reload();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      renameLaeuft.current = false;
+    }
+  };
+
+  const inPapierkorb = async (p: ProjectInfo) => {
+    setLoeschen(null);
+    try {
+      await api.trashProject(p.path);
+      await reload();
+    } catch (e) {
+      setError(String(e));
+    }
+  };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -398,7 +445,7 @@ export function Hub({ onOpen }: { onOpen(path: string): void }) {
   const anyOld = filtered.some((p) => veraltet.has(p.path));
 
   return (
-    <div className="hub">
+    <div className="hub" onClick={() => menu && setMenu(null)}>
       <div className="hub-drag" data-tauri-drag-region />
       <header className="hub-header" data-tauri-drag-region>
         <div className="wordmark">NeoTypst</div>
@@ -428,7 +475,17 @@ export function Hub({ onOpen }: { onOpen(path: string): void }) {
         <section className="recent">
           <div className="recent-head">
             <h2>Weiterarbeiten</h2>
-            {projects && <span>{projects.length === 1 ? "1 Projekt" : `${projects.length} Projekte`}</span>}
+            <span className="recent-meta">
+              {projects && (projects.length === 1 ? "1 Projekt" : `${projects.length} Projekte`)}
+              <button
+                className={"icon-btn recent-reload" + (laedt ? " spinning" : "")}
+                title="Neu einlesen, etwa nach Änderungen im Finder"
+                aria-label="Projektliste neu einlesen"
+                onClick={() => void reload()}
+              >
+                <Icon.refresh />
+              </button>
+            </span>
           </div>
           <div className="recent-table">
             <div className="recent-row recent-cols">
@@ -440,8 +497,44 @@ export function Hub({ onOpen }: { onOpen(path: string): void }) {
               {error && <div className="empty-note">{error}</div>}
               {projects && projects.length === 0 && <div className="empty-note">Noch keine Projekte. Links ein Blatt anlegen.</div>}
               {projects && projects.length > 0 && filtered.length === 0 && <div className="empty-note">Kein Projekt passt zu „{query}“.</div>}
-              {filtered.map((p) => (
-                <button key={p.path} className="recent-row" onClick={() => onOpen(p.path)}>
+              {filtered.map((p) =>
+                renaming === p.path ? (
+                  <div key={p.path} className="recent-row renaming">
+                    <input
+                      className="pname"
+                      aria-label="Neuer Projektname"
+                      defaultValue={p.name}
+                      autoFocus
+                      onFocus={(e) => e.currentTarget.select()}
+                      onBlur={(e) => void umbenennen(p, e.currentTarget.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") void umbenennen(p, e.currentTarget.value);
+                        if (e.key === "Escape") setRenaming(null);
+                      }}
+                    />
+                    <span className="num">{p.files}</span>
+                    <span className="when">{relative(p.modified)}</span>
+                  </div>
+                ) : (
+                <button
+                  key={p.path}
+                  className="recent-row"
+                  onClick={() => onOpen(p.path)}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setMenu({
+                      x: e.clientX,
+                      y: e.clientY,
+                      items: [
+                        { label: "Öffnen", run: () => onOpen(p.path) },
+                        { label: "Umbenennen", run: () => setRenaming(p.path) },
+                        { label: isMac ? "Im Finder zeigen" : "Im Explorer zeigen", run: () => void revealItemInDir(p.path) },
+                        "sep",
+                        { label: "In den Papierkorb …", danger: true, run: () => setLoeschen(p) },
+                      ],
+                    });
+                  }}
+                >
                   <span className="pname">
                     {p.name}
                     {veraltet.has(p.path) && (
@@ -453,7 +546,8 @@ export function Hub({ onOpen }: { onOpen(path: string): void }) {
                   <span className="num">{p.files}</span>
                   <span className="when">{relative(p.modified)}</span>
                 </button>
-              ))}
+                ),
+              )}
             </div>
           </div>
           <p className="recent-foot">
@@ -470,6 +564,35 @@ export function Hub({ onOpen }: { onOpen(path: string): void }) {
           </p>
         </section>
       </main>
+      {menu && <PopupMenu menu={menu} onClose={() => setMenu(null)} />}
+      {loeschen && (
+        <div className="overlay" onMouseDown={() => setLoeschen(null)}>
+          <div
+            className="dialog small-dialog"
+            role="alertdialog"
+            aria-labelledby="loeschen-titel"
+            onMouseDown={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.key === "Escape" && setLoeschen(null)}
+          >
+            <div className="dialog-head">
+              <h2 id="loeschen-titel">„{loeschen.name}“ in den Papierkorb legen?</h2>
+              <p>
+                Der ganze Projektordner mit {loeschen.files === 1 ? "1 Datei" : `${loeschen.files} Dateien`} kommt in den Papierkorb. Von dort lässt er sich
+                wiederherstellen.
+              </p>
+            </div>
+            <div className="dialog-foot">
+              <div className="grow" />
+              <button className="btn" autoFocus onClick={() => setLoeschen(null)}>
+                Abbrechen
+              </button>
+              <button className="btn danger" onClick={() => void inPapierkorb(loeschen)}>
+                In den Papierkorb
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {stilOpen && (
         <StilAlleDialog
           projects={stil}

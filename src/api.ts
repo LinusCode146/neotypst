@@ -52,6 +52,8 @@ export const api = {
   listTemplates: () => invoke<Template[]>("list_templates"),
   createProject: (name: string, template: string, fields: [string, string][] = []) =>
     invoke<string>("create_project", { name, template, fields }),
+  renameProject: (path: string, name: string) => invoke<string>("rename_project", { path, name }),
+  trashProject: (path: string) => invoke<string>("trash_project", { path }),
   templatePreview: (id: string) => invoke<string>("template_preview", { id }),
   saveAsTemplate: (name: string, description: string) => invoke<string>("save_as_template", { name, description }),
   templatesDir: () => invoke<string>("templates_dir"),
