@@ -31,13 +31,21 @@ impl AppState {
 
 // ---------- Projekte ----------
 
+/// Dateiändernde Befehle laufen nicht mehr im Hauptthread, sondern im
+/// Hintergrund und damit gleichzeitig. Diese Sperre hält sie wie zuvor in einer
+/// Reihe, damit sich etwa zwei Speichervorgänge derselben Datei nicht kreuzen.
+fn datei_sperre() -> std::sync::MutexGuard<'static, ()> {
+    static SPERRE: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    SPERRE.lock().unwrap_or_else(|e| e.into_inner())
+}
+
 #[tauri::command]
-fn projects_dir() -> Result<String, String> {
+async fn projects_dir() -> Result<String, String> {
     Ok(project::projects_dir()?.to_string_lossy().into_owned())
 }
 
 #[tauri::command]
-fn list_projects() -> Result<Vec<project::ProjectInfo>, String> {
+async fn list_projects() -> Result<Vec<project::ProjectInfo>, String> {
     project::list_projects()
 }
 
@@ -59,28 +67,32 @@ async fn template_preview(state: State<'_, AppState>, id: String) -> Result<Stri
 }
 
 #[tauri::command]
-fn save_as_template(state: State<'_, AppState>, name: String, description: String) -> Result<String, String> {
+async fn save_as_template(state: State<'_, AppState>, name: String, description: String) -> Result<String, String> {
+    let _sperre = datei_sperre();
     templates::save_project_as_template(&state.root()?, &name, &description)
 }
 
 #[tauri::command]
-fn templates_dir() -> Result<String, String> {
+async fn templates_dir() -> Result<String, String> {
     Ok(templates::user_dir()?.to_string_lossy().into_owned())
 }
 
 #[tauri::command]
-fn create_project(name: String, template: String, fields: Vec<(String, String)>) -> Result<String, String> {
+async fn create_project(name: String, template: String, fields: Vec<(String, String)>) -> Result<String, String> {
+    let _sperre = datei_sperre();
     project::create_project(&name, &template, &fields)
 }
 
 #[tauri::command]
-fn rename_project(path: String, name: String) -> Result<String, String> {
+async fn rename_project(path: String, name: String) -> Result<String, String> {
+    let _sperre = datei_sperre();
     project::rename_project(&path, &name)
 }
 
 /// Legt ein ganzes Projekt in den Papierkorb (von der Startseite aus).
 #[tauri::command]
-fn trash_project(path: String) -> Result<String, String> {
+async fn trash_project(path: String) -> Result<String, String> {
+    let _sperre = datei_sperre();
     project::trash_project(&path)
 }
 
@@ -122,18 +134,18 @@ async fn close_project(state: State<'_, AppState>) -> Result<(), String> {
 // ---------- Dateien ----------
 
 #[tauri::command]
-fn list_files(state: State<'_, AppState>) -> Result<Vec<project::FileEntry>, String> {
+async fn list_files(state: State<'_, AppState>) -> Result<Vec<project::FileEntry>, String> {
     Ok(project::list_files(&state.root()?))
 }
 
 #[tauri::command]
-fn read_file(state: State<'_, AppState>, rel: String) -> Result<String, String> {
+async fn read_file(state: State<'_, AppState>, rel: String) -> Result<String, String> {
     project::read_text(&state.root()?, &rel)
 }
 
 /// Rohdaten einer Datei (PDF, Bild) für den eingebauten Betrachter.
 #[tauri::command]
-fn read_bytes(state: State<'_, AppState>, rel: String) -> Result<tauri::ipc::Response, String> {
+async fn read_bytes(state: State<'_, AppState>, rel: String) -> Result<tauri::ipc::Response, String> {
     let path = project::resolve(&state.root()?, &rel)?;
     std::fs::read(path).map(tauri::ipc::Response::new).map_err(|e| e.to_string())
 }
@@ -141,19 +153,20 @@ fn read_bytes(state: State<'_, AppState>, rel: String) -> Result<tauri::ipc::Res
 /// Speichert und gibt die neue Prüfsumme zurück. Mit `expected` verweigert es
 /// das Speichern, wenn die Datei inzwischen von außen geändert wurde.
 #[tauri::command]
-fn write_file(state: State<'_, AppState>, rel: String, text: String, expected: Option<String>) -> Result<String, String> {
+async fn write_file(state: State<'_, AppState>, rel: String, text: String, expected: Option<String>) -> Result<String, String> {
+    let _sperre = datei_sperre();
     project::save_text(&state.root()?, &rel, &text, expected.as_deref(), history::jetzt())
 }
 
 // ---------- Stil ----------
 
 #[tauri::command]
-fn stil_status(state: State<'_, AppState>) -> Result<Vec<stil::StilDatei>, String> {
+async fn stil_status(state: State<'_, AppState>) -> Result<Vec<stil::StilDatei>, String> {
     Ok(stil::status(&state.root()?))
 }
 
 #[tauri::command]
-fn stil_bundled(path: String) -> Result<String, String> {
+async fn stil_bundled(path: String) -> Result<String, String> {
     stil::mitgeliefert(&path).map(str::to_string)
 }
 
@@ -168,12 +181,13 @@ async fn stil_update(state: State<'_, AppState>, paths: Vec<String>) -> Result<V
 }
 
 #[tauri::command]
-fn stil_scan_all() -> Result<Vec<stil::ProjektStil>, String> {
+async fn stil_scan_all() -> Result<Vec<stil::ProjektStil>, String> {
     stil::alle_projekte()
 }
 
 #[tauri::command]
-fn stil_update_project(path: String, paths: Vec<String>) -> Result<Vec<String>, String> {
+async fn stil_update_project(path: String, paths: Vec<String>) -> Result<Vec<String>, String> {
+    let _sperre = datei_sperre();
     let root = std::path::PathBuf::from(&path);
     let base = project::projects_dir()?;
     if !root.starts_with(&base) {
@@ -183,33 +197,35 @@ fn stil_update_project(path: String, paths: Vec<String>) -> Result<Vec<String>, 
 }
 
 #[tauri::command]
-fn open_text(state: State<'_, AppState>, rel: String) -> Result<project::Opened, String> {
+async fn open_text(state: State<'_, AppState>, rel: String) -> Result<project::Opened, String> {
     project::open_text(&state.root()?, &rel)
 }
 
 #[tauri::command]
-fn file_hash(state: State<'_, AppState>, rel: String) -> Result<Option<String>, String> {
+async fn file_hash(state: State<'_, AppState>, rel: String) -> Result<Option<String>, String> {
     project::file_hash(&state.root()?, &rel)
 }
 
 #[tauri::command]
-fn history_list(state: State<'_, AppState>, rel: String) -> Result<Vec<history::Stand>, String> {
+async fn history_list(state: State<'_, AppState>, rel: String) -> Result<Vec<history::Stand>, String> {
     history::liste(&state.root()?, &rel)
 }
 
 #[tauri::command]
-fn history_read(state: State<'_, AppState>, rel: String, id: String) -> Result<String, String> {
+async fn history_read(state: State<'_, AppState>, rel: String, id: String) -> Result<String, String> {
     history::lesen(&state.root()?, &rel, &id)
 }
 
 /// Sichert einen Stand, etwa den Editor-Inhalt vor dem Neuladen.
 #[tauri::command]
-fn history_snapshot(state: State<'_, AppState>, rel: String, text: String, reason: String) -> Result<bool, String> {
+async fn history_snapshot(state: State<'_, AppState>, rel: String, text: String, reason: String) -> Result<bool, String> {
+    let _sperre = datei_sperre();
     history::sichern(&state.root()?, &rel, &text, &reason, history::jetzt())
 }
 
 #[tauri::command]
-fn create_file(state: State<'_, AppState>, rel: String) -> Result<(), String> {
+async fn create_file(state: State<'_, AppState>, rel: String) -> Result<(), String> {
+    let _sperre = datei_sperre();
     project::create_file(&state.root()?, &rel)
 }
 
@@ -220,12 +236,14 @@ async fn rename_file(state: State<'_, AppState>, from: String, to: String) -> Re
 }
 
 #[tauri::command]
-fn create_dir(state: State<'_, AppState>, rel: String) -> Result<(), String> {
+async fn create_dir(state: State<'_, AppState>, rel: String) -> Result<(), String> {
+    let _sperre = datei_sperre();
     project::create_dir(&state.root()?, &rel)
 }
 
 #[tauri::command]
-fn duplicate_file(state: State<'_, AppState>, rel: String) -> Result<String, String> {
+async fn duplicate_file(state: State<'_, AppState>, rel: String) -> Result<String, String> {
+    let _sperre = datei_sperre();
     project::duplicate(&state.root()?, &rel)
 }
 
@@ -238,18 +256,21 @@ async fn trash_file(state: State<'_, AppState>, rel: String) -> Result<String, S
 }
 
 #[tauri::command]
-fn restore_file(state: State<'_, AppState>, trashed: String, rel: String) -> Result<(), String> {
+async fn restore_file(state: State<'_, AppState>, trashed: String, rel: String) -> Result<(), String> {
+    let _sperre = datei_sperre();
     project::restore(&state.root()?, &trashed, &rel)
 }
 
 #[tauri::command]
-fn import_files(state: State<'_, AppState>, paths: Vec<String>, subdir: String) -> Result<Vec<String>, String> {
+async fn import_files(state: State<'_, AppState>, paths: Vec<String>, subdir: String) -> Result<Vec<String>, String> {
+    let _sperre = datei_sperre();
     project::import_files(&state.root()?, &paths, &subdir)
 }
 
 /// Pasted image: raw bytes as the request body, the file name in the `x-name` header.
 #[tauri::command]
-fn save_asset(state: State<'_, AppState>, request: tauri::ipc::Request<'_>) -> Result<String, String> {
+async fn save_asset(state: State<'_, AppState>, request: tauri::ipc::Request<'_>) -> Result<String, String> {
+    let _sperre = datei_sperre();
     let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else { return Err("Keine Bilddaten".into()) };
     let name = request.headers().get("x-name").and_then(|v| v.to_str().ok()).unwrap_or("image.png");
     let name = percent_decode(name);
@@ -284,7 +305,7 @@ async fn format_typst(text: String, from: Option<usize>, to: Option<usize>, widt
 }
 
 #[tauri::command]
-fn absolute_path(state: State<'_, AppState>, rel: String) -> Result<String, String> {
+async fn absolute_path(state: State<'_, AppState>, rel: String) -> Result<String, String> {
     Ok(project::resolve(&state.root()?, &rel)?.to_string_lossy().into_owned())
 }
 
@@ -415,7 +436,7 @@ async fn learn_word(word: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn bib_overview(state: State<'_, AppState>) -> Result<bib::BibOverview, String> {
+async fn bib_overview(state: State<'_, AppState>) -> Result<bib::BibOverview, String> {
     Ok(bib::overview(&state.root()?))
 }
 
@@ -425,7 +446,8 @@ async fn bib_lookup(query: String, taken: Vec<String>) -> Result<bib::Lookup, St
 }
 
 #[tauri::command]
-fn bib_append(state: State<'_, AppState>, file: String, bibtex: String) -> Result<(), String> {
+async fn bib_append(state: State<'_, AppState>, file: String, bibtex: String) -> Result<(), String> {
+    let _sperre = datei_sperre();
     bib::append(&state.root()?, &file, &bibtex)
 }
 
